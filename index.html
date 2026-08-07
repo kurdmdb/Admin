@@ -7,9 +7,7 @@
     <script src="https://cdn.tailwindcss.com">
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;700&display=swap" rel="stylesheet" />
-    <!-- FontAwesome (optional) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest">
     </script>
     <style>
@@ -801,7 +799,6 @@
             font-size: 1.3rem;
             font-weight: 700;
         }
-        /* Log entries */
         .log-entry {
             background: rgba(15, 15, 15, 0.5);
             border-radius: 12px;
@@ -842,7 +839,7 @@
         }
         .log-entry .log-ip {
             font-family: monospace;
-            background: rgba(0,0,0,0.3);
+            background: rgba(0, 0, 0, 0.3);
             padding: 2px 8px;
             border-radius: 12px;
         }
@@ -876,6 +873,32 @@
         }
         .filter-date-group select:focus {
             border-color: #7c3aed;
+        }
+        .stat-item {
+            background: rgba(15, 15, 15, 0.6);
+            border-radius: 10px;
+            padding: 6px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .stat-item .stat-label {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        .stat-item .stat-value {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .stat-item .stat-value.movie {
+            color: #a78bfa;
+        }
+        .stat-item .stat-value.animation {
+            color: #34d399;
+        }
+        .stat-item .stat-value.total {
+            color: #fbbf24;
         }
     </style>
 </head>
@@ -943,7 +966,7 @@
                 <div class="glass-card p-5 rounded-2xl"><p class="text-gray-500 text-xs md:text-sm mb-1">کۆی واتچلیست</p><h3 class="text-xl md:text-2xl font-bold text-purple-400" id="statWatchlists">0</h3></div>
             </div>
 
-            <!-- Stats by Country and Genre as text cards -->
+            <!-- Stats by Country and Genre - FIXED: now computed from real data -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div class="glass-card p-4 rounded-2xl">
                     <h3 class="text-md font-bold mb-3 text-gray-300"><i data-lucide="flag" class="lucide ml-2 text-purple-400"></i>ئاماری بەپێی وڵات</h3>
@@ -1090,7 +1113,6 @@
                     <h2 class="text-xl font-bold text-gray-200"><i data-lucide="activity" class="lucide ml-2 text-purple-400"></i>چالاکیەکان (لۆگ)</h2>
                     <span class="text-sm text-gray-400 bg-[#1a1a1a] px-4 py-1 rounded-full">کۆی گشتی: <span id="totalLogsCount">0</span></span>
                 </div>
-                <!-- Filters -->
                 <div class="glass-card p-4 rounded-2xl mb-4">
                     <div class="flex flex-wrap gap-4 items-end">
                         <div class="filter-date-group">
@@ -1116,7 +1138,6 @@
                         <button onclick="refreshLogs()" class="gradient-btn px-4 py-2 rounded-xl text-sm flex items-center gap-1"><i data-lucide="refresh-cw" class="lucide"></i> نوێکردنەوە</button>
                     </div>
                 </div>
-                <!-- Logs list -->
                 <div id="logsContainer" class="space-y-2 pb-10"></div>
             </div>
         </div>
@@ -1194,7 +1215,7 @@
             </div>
         </div>
 
-        <!-- ===== COLLECTIONS ===== -->
+        <!-- ===== COLLECTIONS (FIXED) ===== -->
         <div id="section-collections" class="hidden">
             <div class="max-w-6xl mx-auto">
                 <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
@@ -1609,10 +1630,12 @@
                 const { data: top250, error: tErr } = await supabaseClient.from('top250').select('*');
                 if (!tErr && top250) allTop250 = top250;
 
+                // FIX: load collections and collection_items with all fields
                 const { data: collections, error: colErr } = await supabaseClient.from('collections').select('*');
                 if (!colErr && collections) allCollections = collections;
 
-                const { data: collectionItems, error: ciErr } = await supabaseClient.from('collection_items').select('*');
+                const { data: collectionItems, error: ciErr } = await supabaseClient.from('collection_items')
+                    .select('*');
                 if (!ciErr && collectionItems) allCollectionItems = collectionItems;
 
                 // Load logs
@@ -1654,8 +1677,9 @@
                 populateWebsiteCheckboxes();
                 renderTop250();
                 renderCollections();
-                renderCountryGenreStats(); // new function
-                renderLogs(); // new function
+                // FIX: call the new stats function
+                await renderCountryGenreStats();
+                renderLogs();
                 document.getElementById('tmdbStatus').textContent = '✅ داتا لە Supabase بارکرا.';
             } catch (e) {
                 console.error('Error loading data:', e);
@@ -1681,48 +1705,131 @@
         }
 
         // ============================================================
-        // RENDER COUNTRY & GENRE STATS (text version)
+        // RENDER COUNTRY & GENRE STATS - FIXED: compute from real data
         // ============================================================
         async function renderCountryGenreStats() {
-            // Fetch fresh data from tables
-            const { data: countryStats, error: ce } = await supabaseClient.from('film_stats_by_country').select('*');
-            const { data: genreStats, error: ge } = await supabaseClient.from('film_stats_by_genre').select('*');
-            if (ce) console.warn('Country stats error:', ce);
-            if (ge) console.warn('Genre stats error:', ge);
-
             const countryContainer = document.getElementById('countryStatsContainer');
             const genreContainer = document.getElementById('genreStatsContainer');
 
-            // Render country stats
-            if (countryStats && countryStats.length > 0) {
-                countryContainer.innerHTML = countryStats.map(item => `
-                    <div class="flex justify-between items-center bg-[#1a1a1a] p-2 rounded-lg">
-                        <span class="text-sm font-medium">${item.country}</span>
-                        <div class="flex gap-3 text-xs">
-                            <span class="text-purple-400">فیلم: ${item.total_movies || 0}</span>
-                            <span class="text-emerald-400">ئەنیمەیشن: ${item.total_animations || 0}</span>
-                            <span class="text-gray-400">کۆ: ${item.total_films || 0}</span>
-                        </div>
-                    </div>
-                `).join('');
-            } else {
-                countryContainer.innerHTML = '<div class="text-gray-500 text-sm">هیچ داتایەک نییە</div>';
-            }
+            // Show loading state
+            countryContainer.innerHTML = '<div class="text-gray-500 text-sm">⏳ بارکردن...</div>';
+            genreContainer.innerHTML = '<div class="text-gray-500 text-sm">⏳ بارکردن...</div>';
 
-            // Render genre stats
-            if (genreStats && genreStats.length > 0) {
-                genreContainer.innerHTML = genreStats.map(item => `
-                    <div class="flex justify-between items-center bg-[#1a1a1a] p-2 rounded-lg">
-                        <span class="text-sm font-medium">${item.genre}</span>
-                        <div class="flex gap-3 text-xs">
-                            <span class="text-purple-400">فیلم: ${item.total_movies || 0}</span>
-                            <span class="text-emerald-400">ئەنیمەیشن: ${item.total_animations || 0}</span>
-                            <span class="text-gray-400">کۆ: ${item.total_films || 0}</span>
+            try {
+                // ---- GENRE STATS ----
+                // Fetch all genre relationships
+                const [movieGenresRes, animGenresRes, allGenresRes] = await Promise.all([
+                    supabaseClient.from('movie_genres').select('genre_id'),
+                    supabaseClient.from('animation_genres').select('genre_id'),
+                    supabaseClient.from('genres').select('id, name')
+                ]);
+
+                const movieGenreIds = movieGenresRes.data || [];
+                const animGenreIds = animGenresRes.data || [];
+                const genreNames = allGenresRes.data || [];
+
+                // Build genre map
+                const genreMap = {};
+                genreNames.forEach(g => { genreMap[g.id] = g.name; });
+
+                // Count movies per genre
+                const movieCounts = {};
+                movieGenreIds.forEach(row => {
+                    const id = row.genre_id;
+                    movieCounts[id] = (movieCounts[id] || 0) + 1;
+                });
+
+                // Count animations per genre
+                const animCounts = {};
+                animGenreIds.forEach(row => {
+                    const id = row.genre_id;
+                    animCounts[id] = (animCounts[id] || 0) + 1;
+                });
+
+                // Combine
+                const allGenreIds = new Set([...Object.keys(movieCounts), ...Object.keys(animCounts)]);
+                const genreStats = [];
+                allGenreIds.forEach(id => {
+                    const m = movieCounts[id] || 0;
+                    const a = animCounts[id] || 0;
+                    const name = genreMap[id] || `ژانەر ${id}`;
+                    genreStats.push({ genre: name, total_movies: m, total_animations: a, total_films: m + a });
+                });
+                genreStats.sort((a, b) => b.total_films - a.total_films);
+
+                // Render genre stats
+                if (genreStats.length > 0) {
+                    genreContainer.innerHTML = genreStats.map(item => `
+                        <div class="stat-item">
+                            <span class="stat-label">${item.genre}</span>
+                            <div class="flex gap-3 text-xs">
+                                <span class="stat-value movie">فیلم: ${item.total_movies}</span>
+                                <span class="stat-value animation">ئەنیمەیشن: ${item.total_animations}</span>
+                                <span class="stat-value total">کۆ: ${item.total_films}</span>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
-            } else {
-                genreContainer.innerHTML = '<div class="text-gray-500 text-sm">هیچ داتایەک نییە</div>';
+                    `).join('');
+                } else {
+                    genreContainer.innerHTML = '<div class="text-gray-500 text-sm">هیچ داتایەک نییە</div>';
+                }
+
+                // ---- COUNTRY STATS ----
+                const [movieCountriesRes, animCountriesRes, allCountriesRes] = await Promise.all([
+                    supabaseClient.from('movie_countries').select('country_id'),
+                    supabaseClient.from('animation_countries').select('country_id'),
+                    supabaseClient.from('countries').select('id, name')
+                ]);
+
+                const movieCountryIds = movieCountriesRes.data || [];
+                const animCountryIds = animCountriesRes.data || [];
+                const countryNames = allCountriesRes.data || [];
+
+                const countryMap = {};
+                countryNames.forEach(c => { countryMap[c.id] = c.name; });
+
+                const movieCountryCounts = {};
+                movieCountryIds.forEach(row => {
+                    const id = row.country_id;
+                    movieCountryCounts[id] = (movieCountryCounts[id] || 0) + 1;
+                });
+
+                const animCountryCounts = {};
+                animCountryIds.forEach(row => {
+                    const id = row.country_id;
+                    animCountryCounts[id] = (animCountryCounts[id] || 0) + 1;
+                });
+
+                const allCountryIds = new Set([...Object.keys(movieCountryCounts), ...Object.keys(animCountryCounts)]);
+                const countryStats = [];
+                allCountryIds.forEach(id => {
+                    const m = movieCountryCounts[id] || 0;
+                    const a = animCountryCounts[id] || 0;
+                    const name = countryMap[id] || `وڵات ${id}`;
+                    countryStats.push({ country: name, total_movies: m, total_animations: a, total_films: m + a });
+                });
+                countryStats.sort((a, b) => b.total_films - a.total_films);
+
+                if (countryStats.length > 0) {
+                    countryContainer.innerHTML = countryStats.map(item => `
+                        <div class="stat-item">
+                            <span class="stat-label">${item.country}</span>
+                            <div class="flex gap-3 text-xs">
+                                <span class="stat-value movie">فیلم: ${item.total_movies}</span>
+                                <span class="stat-value animation">ئەنیمەیشن: ${item.total_animations}</span>
+                                <span class="stat-value total">کۆ: ${item.total_films}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    countryContainer.innerHTML = '<div class="text-gray-500 text-sm">هیچ داتایەک نییە</div>';
+                }
+
+            } catch (err) {
+                console.error('Error computing stats:', err);
+                countryContainer.innerHTML =
+                    '<div class="text-red-400 text-sm">❌ هەڵە لە بارکردنی ئاماری وڵات</div>';
+                genreContainer.innerHTML =
+                    '<div class="text-red-400 text-sm">❌ هەڵە لە بارکردنی ئاماری ژانەر</div>';
             }
         }
 
@@ -1742,23 +1849,22 @@
             }
 
             container.innerHTML = data.map(log => {
-                // Find user profile for username
                 const user = allProfiles.find(p => p.id === log.user_id);
                 const username = user ? user.username : 'نەناسراو';
                 const time = log.created_at ? new Date(log.created_at).toLocaleString('ckb') : 'N/A';
                 return `
-                    <div class="log-entry">
-                        <span class="log-user">${username}</span>
-                        <span class="log-action">${log.action || 'کردار'}</span>
-                        <span class="log-desc">${log.description || ''}</span>
-                        <div class="log-meta">
-                            <span class="log-ip">${log.ip_address || 'N/A'}</span>
-                            <span class="log-time">${time}</span>
-                            ${log.table_name ? `<span class="text-xs text-gray-600">خشتە: ${log.table_name}</span>` : ''}
-                            ${log.record_id ? `<span class="text-xs text-gray-600">تۆمار: ${log.record_id}</span>` : ''}
+                        <div class="log-entry">
+                            <span class="log-user">${username}</span>
+                            <span class="log-action">${log.action || 'کردار'}</span>
+                            <span class="log-desc">${log.description || ''}</span>
+                            <div class="log-meta">
+                                <span class="log-ip">${log.ip_address || 'N/A'}</span>
+                                <span class="log-time">${time}</span>
+                                ${log.table_name ? `<span class="text-xs text-gray-600">خشتە: ${log.table_name}</span>` : ''}
+                                ${log.record_id ? `<span class="text-xs text-gray-600">تۆمار: ${log.record_id}</span>` : ''}
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
             }).join('');
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
@@ -1797,20 +1903,18 @@
                 if (toVal) toDate = new Date(toVal + 'T23:59:59');
                 document.getElementById('customDateRange').style.display = 'flex';
             } else {
-                // all
                 fromDate = null;
                 toDate = null;
                 document.getElementById('customDateRange').style.display = 'none';
             }
 
-            // If custom but no dates, treat as all
-            if (timeFilter === 'custom' && !document.getElementById('logDateFrom').value && !document.getElementById('logDateTo').value) {
+            if (timeFilter === 'custom' && !document.getElementById('logDateFrom').value && !document.getElementById(
+                    'logDateTo').value) {
                 fromDate = null;
                 toDate = null;
             }
 
             let filtered = allLogs.filter(log => {
-                // Search
                 if (search) {
                     const user = allProfiles.find(p => p.id === log.user_id);
                     const username = user ? user.username.toLowerCase() : '';
@@ -1819,7 +1923,6 @@
                     const userMatch = username.includes(search);
                     if (!actionMatch && !descMatch && !userMatch) return false;
                 }
-                // Date filter
                 if (fromDate || toDate) {
                     const logDate = new Date(log.created_at);
                     if (fromDate && logDate < fromDate) return false;
@@ -1832,7 +1935,6 @@
         }
 
         function refreshLogs() {
-            // Reload logs from DB and reapply filters
             supabaseClient.from('log').select('*').order('created_at', { ascending: false }).then(({ data, error }) => {
                 if (error) { showToast('هەڵە لە بارکردنی لۆگ: ' + error.message, 'error'); return; }
                 allLogs = data || [];
@@ -1840,7 +1942,6 @@
             });
         }
 
-        // Toggle custom date range visibility
         document.getElementById('logTimeFilter').addEventListener('change', function() {
             if (this.value === 'custom') {
                 document.getElementById('customDateRange').style.display = 'flex';
@@ -1870,15 +1971,15 @@
                 const color = item.type === 'movie' ? 'bg-purple-900/50 text-purple-300 border-purple-800' :
                     'bg-emerald-900/50 text-emerald-300 border-emerald-800';
                 container.innerHTML += `
-                    <div class="glass-card p-4 rounded-2xl flex items-center gap-4 animate-fade-up">
-                        <img src="${poster}" class="w-16 h-24 rounded-lg object-cover border border-gray-800" onerror="this.src='https://via.placeholder.com/100x150/1a1a1a/7c3aed?text=No+Image'">
-                        <div>
-                            <span class="text-[10px] ${color} px-2 py-1 rounded mb-1 inline-block border">${typeLabel}</span>
-                            <h3 class="font-bold text-sm md:text-base">${item.kurdish_title || item.title}</h3>
-                            <p class="text-purple-400 text-sm font-bold mt-1">⭐ ${item.rating || item.imdb_rating || 'N/A'}</p>
+                        <div class="glass-card p-4 rounded-2xl flex items-center gap-4 animate-fade-up">
+                            <img src="${poster}" class="w-16 h-24 rounded-lg object-cover border border-gray-800" onerror="this.src='https://via.placeholder.com/100x150/1a1a1a/7c3aed?text=No+Image'">
+                            <div>
+                                <span class="text-[10px] ${color} px-2 py-1 rounded mb-1 inline-block border">${typeLabel}</span>
+                                <h3 class="font-bold text-sm md:text-base">${item.kurdish_title || item.title}</h3>
+                                <p class="text-purple-400 text-sm font-bold mt-1">⭐ ${item.rating || item.imdb_rating || 'N/A'}</p>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
             });
         }
 
@@ -1895,10 +1996,12 @@
                 const el = document.getElementById(id);
                 if (!el) return;
                 if (isSuper) el.style.display = 'flex';
-                else if (isAdmin && ['menuContent', 'menuManage', 'menuWebsites', 'menuTop250', 'menuCollections', 'menuActivities']
-                    .includes(id)) el.style.display = 'flex';
-                else if (isAdmin && !['menuContent', 'menuManage', 'menuWebsites', 'menuTop250', 'menuCollections', 'menuActivities']
-                    .includes(id)) el.style.display = 'none';
+                else if (isAdmin && ['menuContent', 'menuManage', 'menuWebsites', 'menuTop250', 'menuCollections',
+                        'menuActivities'
+                    ].includes(id)) el.style.display = 'flex';
+                else if (isAdmin && !['menuContent', 'menuManage', 'menuWebsites', 'menuTop250', 'menuCollections',
+                        'menuActivities'
+                    ].includes(id)) el.style.display = 'none';
                 else el.style.display = 'none';
             });
         }
@@ -1919,9 +2022,11 @@
                     showToast('تەنها دەستت بە داشبۆرد هەیە', 'error');
                     return;
                 }
-                if (role === 'admin' && !['content', 'manage', 'dashboard', 'websites', 'top250', 'collections', 'activities']
-                    .includes(section)) {
-                    showToast('تەنها دەستت بە بەشی زیادکردن و بەرهەمەکان و وێبسایتەکان و ٢٥٠ باشترین و کۆکراوەکان و چالاکیەکان هەیە',
+                if (role === 'admin' && !['content', 'manage', 'dashboard', 'websites', 'top250', 'collections',
+                        'activities'
+                    ].includes(section)) {
+                    showToast(
+                        'تەنها دەستت بە بەشی زیادکردن و بەرهەمەکان و وێبسایتەکان و ٢٥٠ باشترین و کۆکراوەکان و چالاکیەکان هەیە',
                         'error');
                     return;
                 }
@@ -1980,32 +2085,32 @@
                 const card = document.createElement('div');
                 card.className = 'glass-card p-4 rounded-2xl flex flex-col gap-2';
                 card.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <img src="${avatar}" class="w-12 h-12 rounded-full border-2 border-purple-500 object-cover" onerror="this.src='https://i.pravatar.cc/150'">
-                        <div class="flex-1">
-                            <h3 class="font-bold text-md">${user.username}</h3>
-                            <p class="text-xs text-gray-400">${user.email}</p>
+                        <div class="flex items-center gap-3">
+                            <img src="${avatar}" class="w-12 h-12 rounded-full border-2 border-purple-500 object-cover" onerror="this.src='https://i.pravatar.cc/150'">
+                            <div class="flex-1">
+                                <h3 class="font-bold text-md">${user.username}</h3>
+                                <p class="text-xs text-gray-400">${user.email}</p>
+                            </div>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full ${roleColor} border">${roleLabel}</span>
                         </div>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full ${roleColor} border">${roleLabel}</span>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2 mt-1 text-xs">
-                        <span class="bg-blue-900/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-800/40">لیڤڵ: ${user.level || 1}</span>
-                        <span class="bg-cyan-900/20 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-800/40">XP: ${user.xp || 0}</span>
-                        <span class="bg-green-900/20 text-green-400 px-2 py-0.5 rounded-full border border-green-800/40">بەکارهێنەر لە: ${user.join_date ? new Date(user.join_date).toLocaleDateString('ckb') : 'N/A'}</span>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2 mt-1 text-xs">
-                        <span class="bg-red-900/20 text-red-400 px-2 py-0.5 rounded-full border border-red-800/40">باند: ${isBanned ? (user.ban_expiry ? `تا ${banExpiryText}` : 'بەهەتا') : 'باند نییە'}</span>
-                        <span class="bg-orange-900/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-800/40">بلۆک: ${isBlocked ? (user.block_expiry ? `تا ${blockExpiryText}` : 'بەهەتا') : 'بلۆک نییە'}</span>
-                    </div>
-                    <div class="flex flex-wrap gap-2 mt-2">
-                        <button onclick="openTimeModal('${user.id}', 'ban')" class="text-xs bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="ban" class="lucide"></i> باند</button>
-                        <button onclick="openTimeModal('${user.id}', 'block')" class="text-xs bg-orange-600/20 hover:bg-orange-600 text-orange-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="lock" class="lucide"></i> بلۆک</button>
-                        <button onclick="removeBan('${user.id}')" class="text-xs bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="undo" class="lucide"></i> لابردنی باند</button>
-                        <button onclick="removeBlock('${user.id}')" class="text-xs bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="unlock" class="lucide"></i> لابردنی بلۆک</button>
-                        ${user.role !== 'super' ? `<button onclick="toggleAdmin('${user.id}')" class="text-xs bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="user-cog" class="lucide"></i> ${user.role === 'admin' ? 'لابردنی ئەدمین' : 'ڕۆڵی ئەدمین بدە'}</button>` : ''}
-                        <button onclick="openUserDetailModal('${user.id}')" class="text-xs bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="info" class="lucide"></i> وردەکان</button>
-                    </div>
-                `;
+                        <div class="flex flex-wrap items-center gap-2 mt-1 text-xs">
+                            <span class="bg-blue-900/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-800/40">لیڤڵ: ${user.level || 1}</span>
+                            <span class="bg-cyan-900/20 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-800/40">XP: ${user.xp || 0}</span>
+                            <span class="bg-green-900/20 text-green-400 px-2 py-0.5 rounded-full border border-green-800/40">بەکارهێنەر لە: ${user.join_date ? new Date(user.join_date).toLocaleDateString('ckb') : 'N/A'}</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 mt-1 text-xs">
+                            <span class="bg-red-900/20 text-red-400 px-2 py-0.5 rounded-full border border-red-800/40">باند: ${isBanned ? (user.ban_expiry ? `تا ${banExpiryText}` : 'بەهەتا') : 'باند نییە'}</span>
+                            <span class="bg-orange-900/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-800/40">بلۆک: ${isBlocked ? (user.block_expiry ? `تا ${blockExpiryText}` : 'بەهەتا') : 'بلۆک نییە'}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mt-2">
+                            <button onclick="openTimeModal('${user.id}', 'ban')" class="text-xs bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="ban" class="lucide"></i> باند</button>
+                            <button onclick="openTimeModal('${user.id}', 'block')" class="text-xs bg-orange-600/20 hover:bg-orange-600 text-orange-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="lock" class="lucide"></i> بلۆک</button>
+                            <button onclick="removeBan('${user.id}')" class="text-xs bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="undo" class="lucide"></i> لابردنی باند</button>
+                            <button onclick="removeBlock('${user.id}')" class="text-xs bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="unlock" class="lucide"></i> لابردنی بلۆک</button>
+                            ${user.role !== 'super' ? `<button onclick="toggleAdmin('${user.id}')" class="text-xs bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="user-cog" class="lucide"></i> ${user.role === 'admin' ? 'لابردنی ئەدمین' : 'ڕۆڵی ئەدمین بدە'}</button>` : ''}
+                            <button onclick="openUserDetailModal('${user.id}')" class="text-xs bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-3 py-1 rounded-lg transition flex items-center gap-1"><i data-lucide="info" class="lucide"></i> وردەکان</button>
+                        </div>
+                    `;
                 container.appendChild(card);
             });
             if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -2128,20 +2233,20 @@
             const avatar = user.avatar_url || 'https://i.pravatar.cc/150?img=' + (user.id ? user.id.charCodeAt(0) %
                 70 : 1);
             userDetailContent.innerHTML = `
-                <div class="flex items-center gap-4 border-b border-[#1a1a1a] pb-3">
-                    <img src="${avatar}" class="w-16 h-16 rounded-full border-2 border-purple-500 object-cover" onerror="this.src='https://i.pravatar.cc/150'">
-                    <div><h4 class="font-bold text-lg">${user.username}</h4><p class="text-gray-400 text-sm">${user.email}</p></div>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-sm">
-                    <div><span class="text-gray-400">ڕۆڵ:</span> <span class="text-purple-300">${user.role === 'super' ? 'سەرۆک' : user.role === 'admin' ? 'ئەدمین' : 'ئاسایی'}</span></div>
-                    <div><span class="text-gray-400">لیڤڵ:</span> <span class="text-blue-300">${user.level || 1}</span></div>
-                    <div><span class="text-gray-400">XP:</span> <span class="text-yellow-300">${user.xp || 0}</span></div>
-                    <div><span class="text-gray-400">بەرواری چوون:</span> <span class="text-cyan-300">${user.join_date ? new Date(user.join_date).toLocaleDateString('ckb') : 'N/A'}</span></div>
-                    <div><span class="text-gray-400">باند:</span> <span class="${isBanned ? 'text-red-400' : 'text-green-400'}">${isBanned ? `بەندی (${banExpiryText})` : 'باند نییە'}</span></div>
-                    <div><span class="text-gray-400">بلۆک:</span> <span class="${isBlocked ? 'text-orange-400' : 'text-green-400'}">${isBlocked ? `بلۆک کراوە (${blockExpiryText})` : 'بلۆک نییە'}</span></div>
-                </div>
-                <div class="border-t border-[#1a1a1a] pt-3 mt-1 text-xs text-gray-500"><p>UUID: ${user.id}</p></div>
-            `;
+                    <div class="flex items-center gap-4 border-b border-[#1a1a1a] pb-3">
+                        <img src="${avatar}" class="w-16 h-16 rounded-full border-2 border-purple-500 object-cover" onerror="this.src='https://i.pravatar.cc/150'">
+                        <div><h4 class="font-bold text-lg">${user.username}</h4><p class="text-gray-400 text-sm">${user.email}</p></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div><span class="text-gray-400">ڕۆڵ:</span> <span class="text-purple-300">${user.role === 'super' ? 'سەرۆک' : user.role === 'admin' ? 'ئەدمین' : 'ئاسایی'}</span></div>
+                        <div><span class="text-gray-400">لیڤڵ:</span> <span class="text-blue-300">${user.level || 1}</span></div>
+                        <div><span class="text-gray-400">XP:</span> <span class="text-yellow-300">${user.xp || 0}</span></div>
+                        <div><span class="text-gray-400">بەرواری چوون:</span> <span class="text-cyan-300">${user.join_date ? new Date(user.join_date).toLocaleDateString('ckb') : 'N/A'}</span></div>
+                        <div><span class="text-gray-400">باند:</span> <span class="${isBanned ? 'text-red-400' : 'text-green-400'}">${isBanned ? `بەندی (${banExpiryText})` : 'باند نییە'}</span></div>
+                        <div><span class="text-gray-400">بلۆک:</span> <span class="${isBlocked ? 'text-orange-400' : 'text-green-400'}">${isBlocked ? `بلۆک کراوە (${blockExpiryText})` : 'بلۆک نییە'}</span></div>
+                    </div>
+                    <div class="border-t border-[#1a1a1a] pt-3 mt-1 text-xs text-gray-500"><p>UUID: ${user.id}</p></div>
+                `;
             userDetailModal.classList.add('active');
         }
         userDetailClose.addEventListener('click', function() { userDetailModal.classList.remove('active'); });
@@ -2159,21 +2264,21 @@
             const sorted = [...allHeroSlides].sort((a, b) => (a.order || 999) - (b.order || 999));
             sorted.forEach((item) => {
                 c.innerHTML += `
-                    <div class="item-card">
-                        <div class="info">
-                            <h4>${item.hero_title || 'بێ ناونیشان'}</h4>
-                            <p>${item.hero_subtitle || ''}</p>
-                            <p class="text-xs text-gray-500">ڕیزبەندی: ${item.order || '—'}</p>
-                            ${item.hero_background ? `<p class="text-xs text-gray-500">باگراوند: ${item.hero_background.substring(0,30)}...</p>` : ''}
-                            ${item.hero_trailer ? `<p class="text-xs text-gray-500">ترەیلەر: ${item.hero_trailer.substring(0,30)}...</p>` : ''}
-                            ${item.hero_button_text ? `<p class="text-xs text-gray-400">دوگمە: ${item.hero_button_text}</p>` : ''}
+                        <div class="item-card">
+                            <div class="info">
+                                <h4>${item.hero_title || 'بێ ناونیشان'}</h4>
+                                <p>${item.hero_subtitle || ''}</p>
+                                <p class="text-xs text-gray-500">ڕیزبەندی: ${item.order || '—'}</p>
+                                ${item.hero_background ? `<p class="text-xs text-gray-500">باگراوند: ${item.hero_background.substring(0,30)}...</p>` : ''}
+                                ${item.hero_trailer ? `<p class="text-xs text-gray-500">ترەیلەر: ${item.hero_trailer.substring(0,30)}...</p>` : ''}
+                                ${item.hero_button_text ? `<p class="text-xs text-gray-400">دوگمە: ${item.hero_button_text}</p>` : ''}
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="openHeroModal('${item.id}')" class="text-blue-400 hover:text-blue-300"><i data-lucide="edit" class="lucide"></i></button>
+                                <button onclick="deleteHero('${item.id}')" class="text-red-500"><i data-lucide="trash" class="lucide"></i></button>
+                            </div>
                         </div>
-                        <div class="flex gap-2">
-                            <button onclick="openHeroModal('${item.id}')" class="text-blue-400 hover:text-blue-300"><i data-lucide="edit" class="lucide"></i></button>
-                            <button onclick="deleteHero('${item.id}')" class="text-red-500"><i data-lucide="trash" class="lucide"></i></button>
-                        </div>
-                    </div>
-                `;
+                    `;
             });
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
@@ -2417,22 +2522,22 @@
                 const mediaUrl = mediaType === 'video' ? ad.media_url : ad.image_url;
                 const mediaLabel = mediaType === 'video' ? '🎬 ڤیدیۆ' : '🖼️ وێنە';
                 container.innerHTML += `
-                    <div class="item-card">
-                        ${mediaType === 'image' ? `<img src="${mediaUrl}" alt="${ad.title}" class="w-20 h-20 object-cover rounded-lg border border-gray-700" onerror="this.src='https://via.placeholder.com/80x80/1a1a1a/7c3aed?text=No+Image'">` : 
-                        `<video src="${mediaUrl}" class="w-20 h-20 object-cover rounded-lg border border-gray-700" controls></video>`}
-                        <div class="info">
-                            <h4>${ad.title}</h4>
-                            <p class="text-xs text-gray-400">جۆر: ${mediaLabel}</p>
-                            <p class="text-xs text-gray-400">لینکی کلیک: ${ad.link || 'نییە'}</p>
-                            <p class="text-xs text-gray-400">ڕیزبەندی: ${ad.order || 1}</p>
-                            <p class="text-xs ${statusColor}">دۆخ: ${statusText}</p>
+                        <div class="item-card">
+                            ${mediaType === 'image' ? `<img src="${mediaUrl}" alt="${ad.title}" class="w-20 h-20 object-cover rounded-lg border border-gray-700" onerror="this.src='https://via.placeholder.com/80x80/1a1a1a/7c3aed?text=No+Image'">` : 
+                            `<video src="${mediaUrl}" class="w-20 h-20 object-cover rounded-lg border border-gray-700" controls></video>`}
+                            <div class="info">
+                                <h4>${ad.title}</h4>
+                                <p class="text-xs text-gray-400">جۆر: ${mediaLabel}</p>
+                                <p class="text-xs text-gray-400">لینکی کلیک: ${ad.link || 'نییە'}</p>
+                                <p class="text-xs text-gray-400">ڕیزبەندی: ${ad.order || 1}</p>
+                                <p class="text-xs ${statusColor}">دۆخ: ${statusText}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="editAd('${ad.id}')" class="text-blue-400 hover:text-blue-300"><i data-lucide="edit" class="lucide"></i></button>
+                                <button onclick="deleteAd('${ad.id}')" class="text-red-500 hover:text-red-400"><i data-lucide="trash" class="lucide"></i></button>
+                            </div>
                         </div>
-                        <div class="flex gap-2">
-                            <button onclick="editAd('${ad.id}')" class="text-blue-400 hover:text-blue-300"><i data-lucide="edit" class="lucide"></i></button>
-                            <button onclick="deleteAd('${ad.id}')" class="text-red-500 hover:text-red-400"><i data-lucide="trash" class="lucide"></i></button>
-                        </div>
-                    </div>
-                `;
+                    `;
             });
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
@@ -2547,25 +2652,25 @@
                     'bg-gray-800 text-gray-300';
 
                 container.innerHTML += `
-                    <div class="comment-item flex items-start gap-3">
-                        <img src="${avatar}" class="comment-avatar" onerror="this.src='https://i.pravatar.cc/150'">
-                        <div class="flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="font-bold text-sm">${comment.username || 'نەناسراو'}</span>
-                                <span class="text-xs text-gray-500">${dateFormatted}</span>
-                                <span class="text-xs bg-yellow-900/20 text-yellow-400 px-2 py-0.5 rounded-full"><i data-lucide="heart" class="lucide ml-1"></i>${comment.likes || 0}</span>
-                                <span class="text-xs ${typeColor} px-2 py-0.5 rounded-full border">${contentTypeLabel}</span>
-                                <span class="text-xs bg-blue-900/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-800/30">${filmName}</span>
+                        <div class="comment-item flex items-start gap-3">
+                            <img src="${avatar}" class="comment-avatar" onerror="this.src='https://i.pravatar.cc/150'">
+                            <div class="flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-bold text-sm">${comment.username || 'نەناسراو'}</span>
+                                    <span class="text-xs text-gray-500">${dateFormatted}</span>
+                                    <span class="text-xs bg-yellow-900/20 text-yellow-400 px-2 py-0.5 rounded-full"><i data-lucide="heart" class="lucide ml-1"></i>${comment.likes || 0}</span>
+                                    <span class="text-xs ${typeColor} px-2 py-0.5 rounded-full border">${contentTypeLabel}</span>
+                                    <span class="text-xs bg-blue-900/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-800/30">${filmName}</span>
+                                </div>
+                                <p class="text-sm text-gray-200 mt-1">${comment.text}</p>
+                                <div class="text-[10px] text-gray-500 mt-1">
+                                    content_id: ${comment.content_id || 'N/A'} • user_id: ${comment.user_id || 'N/A'}
+                                    ${comment.updated_at ? `• نوێکراوە: ${new Date(comment.updated_at).toLocaleString('ckb')}` : ''}
+                                </div>
                             </div>
-                            <p class="text-sm text-gray-200 mt-1">${comment.text}</p>
-                            <div class="text-[10px] text-gray-500 mt-1">
-                                content_id: ${comment.content_id || 'N/A'} • user_id: ${comment.user_id || 'N/A'}
-                                ${comment.updated_at ? `• نوێکراوە: ${new Date(comment.updated_at).toLocaleString('ckb')}` : ''}
-                            </div>
+                            <button onclick="deleteComment('${comment.id}')" class="text-red-500 hover:text-red-400 text-sm"><i data-lucide="trash" class="lucide"></i></button>
                         </div>
-                        <button onclick="deleteComment('${comment.id}')" class="text-red-500 hover:text-red-400 text-sm"><i data-lucide="trash" class="lucide"></i></button>
-                    </div>
-                `;
+                    `;
             });
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
@@ -2596,18 +2701,18 @@
             }
             allWebsites.forEach(ws => {
                 container.innerHTML += `
-                    <div class="item-card">
-                        <img src="${ws.logo_url}" alt="${ws.name}" class="w-12 h-12 object-contain rounded-lg border border-gray-700" onerror="this.src='https://via.placeholder.com/48/1a1a1a/7c3aed?text=Logo'">
-                        <div class="info">
-                            <h4>${ws.name}</h4>
-                            <p class="text-xs text-gray-400">${ws.logo_url}</p>
+                        <div class="item-card">
+                            <img src="${ws.logo_url}" alt="${ws.name}" class="w-12 h-12 object-contain rounded-lg border border-gray-700" onerror="this.src='https://via.placeholder.com/48/1a1a1a/7c3aed?text=Logo'">
+                            <div class="info">
+                                <h4>${ws.name}</h4>
+                                <p class="text-xs text-gray-400">${ws.logo_url}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="editWebsite('${ws.id}')" class="text-blue-400 hover:text-blue-300"><i data-lucide="edit" class="lucide"></i></button>
+                                <button onclick="deleteWebsite('${ws.id}')" class="text-red-500 hover:text-red-400"><i data-lucide="trash" class="lucide"></i></button>
+                            </div>
                         </div>
-                        <div class="flex gap-2">
-                            <button onclick="editWebsite('${ws.id}')" class="text-blue-400 hover:text-blue-300"><i data-lucide="edit" class="lucide"></i></button>
-                            <button onclick="deleteWebsite('${ws.id}')" class="text-red-500 hover:text-red-400"><i data-lucide="trash" class="lucide"></i></button>
-                        </div>
-                    </div>
-                `;
+                    `;
             });
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
@@ -2664,10 +2769,10 @@
                 const label = document.createElement('label');
                 label.className = 'platform-checkbox';
                 label.innerHTML = `
-                    <img src="${ws.logo_url}" alt="${ws.name}" onerror="this.style.display='none'">
-                    <span>${ws.name}</span>
-                    <input type="checkbox" value="${ws.id}" class="website-check" />
-                `;
+                        <img src="${ws.logo_url}" alt="${ws.name}" onerror="this.style.display='none'">
+                        <span>${ws.name}</span>
+                        <input type="checkbox" value="${ws.id}" class="website-check" />
+                    `;
                 container.appendChild(label);
             });
         }
@@ -2705,14 +2810,14 @@
                     const poster = item.poster_url || 'https://via.placeholder.com/30x45/1a1a1a/7c3aed?text=No+Image';
                     const typeLabel = item.type === 'movie' ? 'فیلم' : 'ئەنیمەیشن';
                     html += `
-                        <div class="result-item" onclick="selectTop250Content('${item.id}','${item.type}')">
-                            <img src="${poster}" alt="">
-                            <div>
-                                <div class="title">${item.title}</div>
-                                <div class="sub">${typeLabel} • ${item.release_date || 'N/A'}</div>
+                            <div class="result-item" onclick="selectTop250Content('${item.id}','${item.type}')">
+                                <img src="${poster}" alt="">
+                                <div>
+                                    <div class="title">${item.title}</div>
+                                    <div class="sub">${typeLabel} • ${item.release_date || 'N/A'}</div>
+                                </div>
                             </div>
-                        </div>
-                    `;
+                        `;
                 });
                 resultsDiv.innerHTML = html;
                 resultsDiv.style.display = 'block';
@@ -2788,12 +2893,12 @@
                 }
                 if (!content) {
                     container.innerHTML += `
-                        <div class="top250-item">
-                            <div class="rank-num">#${t.rank || '?'}</div>
-                            <div class="info"><h4 class="text-red-400">بەرهەم نەدۆزرایەوە (ID: ${t.content_id})</h4></div>
-                            <button onclick="deleteTop250('${t.id}')" class="delete-btn"><i data-lucide="x" class="lucide"></i></button>
-                        </div>
-                    `;
+                            <div class="top250-item">
+                                <div class="rank-num">#${t.rank || '?'}</div>
+                                <div class="info"><h4 class="text-red-400">بەرهەم نەدۆزرایەوە (ID: ${t.content_id})</h4></div>
+                                <button onclick="deleteTop250('${t.id}')" class="delete-btn"><i data-lucide="x" class="lucide"></i></button>
+                            </div>
+                        `;
                     return;
                 }
                 const poster = content.poster_url || 'https://via.placeholder.com/50x70/1a1a1a/7c3aed?text=No+Image';
@@ -2803,18 +2908,18 @@
                 const year = content.release_date || 'N/A';
 
                 container.innerHTML += `
-                    <div class="top250-item">
-                        <div class="rank-num">#${t.rank || '?'}</div>
-                        <img src="${poster}" onerror="this.src='https://via.placeholder.com/50x70/1a1a1a/7c3aed?text=No+Image'">
-                        <div class="info">
-                            <h4>${title} <span class="text-sm text-gray-400">(${orig})</span></h4>
-                            <p>${typeLabel} • ${year} • ⭐ ${rating}</p>
-                            <p class="text-xs text-gray-500">content_id: ${t.content_id} • جۆر: ${t.content_type}</p>
-                            ${t.created_at ? `<p class="text-xs text-gray-600">زیادکراوە: ${new Date(t.created_at).toLocaleString('ckb')}</p>` : ''}
+                        <div class="top250-item">
+                            <div class="rank-num">#${t.rank || '?'}</div>
+                            <img src="${poster}" onerror="this.src='https://via.placeholder.com/50x70/1a1a1a/7c3aed?text=No+Image'">
+                            <div class="info">
+                                <h4>${title} <span class="text-sm text-gray-400">(${orig})</span></h4>
+                                <p>${typeLabel} • ${year} • ⭐ ${rating}</p>
+                                <p class="text-xs text-gray-500">content_id: ${t.content_id} • جۆر: ${t.content_type}</p>
+                                ${t.created_at ? `<p class="text-xs text-gray-600">زیادکراوە: ${new Date(t.created_at).toLocaleString('ckb')}</p>` : ''}
+                            </div>
+                            <button onclick="deleteTop250('${t.id}')" class="delete-btn"><i data-lucide="trash" class="lucide"></i></button>
                         </div>
-                        <button onclick="deleteTop250('${t.id}')" class="delete-btn"><i data-lucide="trash" class="lucide"></i></button>
-                    </div>
-                `;
+                    `;
             });
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
@@ -2867,7 +2972,7 @@
         document.getElementById('filterTop250Type')?.addEventListener('change', renderTop250);
 
         // ============================================================
-        // COLLECTIONS (unchanged)
+        // COLLECTIONS - FIXED: display issues resolved
         // ============================================================
         const collectionModal = document.getElementById('collectionModal');
         const collectionForm = document.getElementById('collectionForm');
@@ -2941,20 +3046,20 @@
             sorted.forEach(col => {
                 const count = allCollectionItems.filter(ci => String(ci.collection_id) === String(col.id)).length;
                 container.innerHTML += `
-                    <div class="collection-card">
-                        <img src="${col.cover_url || 'https://via.placeholder.com/80x80/1a1a1a/7c3aed?text=No+Image'}" onerror="this.src='https://via.placeholder.com/80x80/1a1a1a/7c3aed?text=No+Image'">
-                        <div class="info">
-                            <h3>${col.name}</h3>
-                            <p>${col.description || ''}</p>
-                            <div class="meta">${count} بەرهەم • ڕیزبەندی: ${col.display_order || 1}</div>
+                        <div class="collection-card">
+                            <img src="${col.cover_url || 'https://via.placeholder.com/80x80/1a1a1a/7c3aed?text=No+Image'}" onerror="this.src='https://via.placeholder.com/80x80/1a1a1a/7c3aed?text=No+Image'">
+                            <div class="info">
+                                <h3>${col.name}</h3>
+                                <p>${col.description || ''}</p>
+                                <div class="meta">${count} بەرهەم • ڕیزبەندی: ${col.display_order || 1}</div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="viewCollection('${col.id}')" class="text-blue-400 hover:text-blue-300"><i data-lucide="eye" class="lucide"></i></button>
+                                <button onclick="openCollectionModal('${col.id}')" class="text-purple-400 hover:text-purple-300"><i data-lucide="edit" class="lucide"></i></button>
+                                <button onclick="deleteCollection('${col.id}')" class="text-red-500 hover:text-red-400"><i data-lucide="trash" class="lucide"></i></button>
+                            </div>
                         </div>
-                        <div class="flex gap-2">
-                            <button onclick="viewCollection('${col.id}')" class="text-blue-400 hover:text-blue-300"><i data-lucide="eye" class="lucide"></i></button>
-                            <button onclick="openCollectionModal('${col.id}')" class="text-purple-400 hover:text-purple-300"><i data-lucide="edit" class="lucide"></i></button>
-                            <button onclick="deleteCollection('${col.id}')" class="text-red-500 hover:text-red-400"><i data-lucide="trash" class="lucide"></i></button>
-                        </div>
-                    </div>
-                `;
+                    `;
             });
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
@@ -2971,6 +3076,24 @@
             if (currentCollectionId === id) closeCollectionDetail();
             renderCollections();
             showToast('✅ کۆکراوە سڕایەوە', 'success');
+        }
+
+        // Helper: get content by collection items - FIX: properly handles content_type
+        function getContentByCollectionItems(items) {
+            const map = {};
+            items.forEach(i => {
+                let content = null;
+                const type = (i.content_type || '').toLowerCase();
+                if (type === 'movie') {
+                    content = allMovies.find(c => String(c.id) === String(i.content_id));
+                } else if (type === 'animation') {
+                    content = allAnimations.find(c => String(c.id) === String(i.content_id));
+                }
+                if (content) {
+                    map[i.content_id] = { ...content, _type: type };
+                }
+            });
+            return map;
         }
 
         function viewCollection(id) {
@@ -3009,41 +3132,37 @@
                 return;
             }
 
+            // Use the helper to get content
+            const contentMap = getContentByCollectionItems(sorted);
+
             sorted.forEach(ci => {
-                let content = null;
-                let typeLabel = '';
-                if (ci.content_type === 'movie') {
-                    content = allMovies.find(m => String(m.id) === String(ci.content_id));
-                    typeLabel = 'فیلم';
-                } else if (ci.content_type === 'animation') {
-                    content = allAnimations.find(a => String(a.id) === String(ci.content_id));
-                    typeLabel = 'ئەنیمەیشن';
-                }
+                const content = contentMap[ci.content_id];
                 if (!content) {
                     container.innerHTML += `
-                        <div class="collection-item-card">
-                            <div class="info"><h4 class="text-red-400">بەرهەم نەدۆزرایەوە (ID: ${ci.content_id})</h4></div>
-                            <button onclick="deleteCollectionItem('${ci.id}')" class="text-red-500"><i data-lucide="trash" class="lucide"></i></button>
-                        </div>
-                    `;
+                            <div class="collection-item-card">
+                                <div class="info"><h4 class="text-red-400">بەرهەم نەدۆزرایەوە (ID: ${ci.content_id})</h4></div>
+                                <button onclick="deleteCollectionItem('${ci.id}')" class="text-red-500"><i data-lucide="trash" class="lucide"></i></button>
+                            </div>
+                        `;
                     return;
                 }
                 const poster = content.poster_url || 'https://via.placeholder.com/50x70/1a1a1a/7c3aed?text=No+Image';
                 const title = content.kurdish_title || content.title || 'N/A';
                 const orig = content.title || '';
                 const year = content.release_date || 'N/A';
+                const typeLabel = content._type === 'movie' ? 'فیلم' : 'ئەنیمەیشن';
 
                 container.innerHTML += `
-                    <div class="collection-item-card">
-                        <img src="${poster}" onerror="this.src='https://via.placeholder.com/50x70/1a1a1a/7c3aed?text=No+Image'">
-                        <div class="info">
-                            <h4>${title} <span class="text-sm text-gray-400">(${orig})</span></h4>
-                            <p>${typeLabel} • ${year}</p>
-                            <span class="order-badge">ڕیزبەندی: ${ci.display_order || 1}</span>
+                        <div class="collection-item-card">
+                            <img src="${poster}" onerror="this.src='https://via.placeholder.com/50x70/1a1a1a/7c3aed?text=No+Image'">
+                            <div class="info">
+                                <h4>${title} <span class="text-sm text-gray-400">(${orig})</span></h4>
+                                <p>${typeLabel} • ${year}</p>
+                                <span class="order-badge">ڕیزبەندی: ${ci.display_order || 1}</span>
+                            </div>
+                            <button onclick="deleteCollectionItem('${ci.id}')" class="text-red-500 hover:text-red-400"><i data-lucide="trash" class="lucide"></i></button>
                         </div>
-                        <button onclick="deleteCollectionItem('${ci.id}')" class="text-red-500 hover:text-red-400"><i data-lucide="trash" class="lucide"></i></button>
-                    </div>
-                `;
+                    `;
             });
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
@@ -3087,14 +3206,14 @@
                     const poster = item.poster_url || 'https://via.placeholder.com/30x45/1a1a1a/7c3aed?text=No+Image';
                     const typeLabel = item.type === 'movie' ? 'فیلم' : 'ئەنیمەیشن';
                     html += `
-                        <div class="result-item" onclick="selectCollectionItemContent('${item.id}','${item.type}')">
-                            <img src="${poster}" alt="">
-                            <div>
-                                <div class="title">${item.title}</div>
-                                <div class="sub">${typeLabel} • ${item.release_date || 'N/A'}</div>
+                            <div class="result-item" onclick="selectCollectionItemContent('${item.id}','${item.type}')">
+                                <img src="${poster}" alt="">
+                                <div>
+                                    <div class="title">${item.title}</div>
+                                    <div class="sub">${typeLabel} • ${item.release_date || 'N/A'}</div>
+                                </div>
                             </div>
-                        </div>
-                    `;
+                        `;
                 });
                 resultsDiv.innerHTML = html;
                 resultsDiv.style.display = 'block';
@@ -3211,13 +3330,13 @@
             const div = document.createElement('div');
             div.className = 'sub-item';
             div.innerHTML = `
-                <div style="flex:1;display:flex;flex-wrap:wrap;gap:8px;">
-                    <input type="text" placeholder="ناوی ئەکتەر" class="search-input" style="flex:1;min-width:100px;" value="${actor}">
-                    <input type="text" placeholder="لینکی وێنە" class="search-input" style="flex:1;min-width:100px;" value="${image}">
-                    <input type="text" placeholder="ناوی کاراکتەر" class="search-input" style="flex:1;min-width:100px;" value="${character}">
-                </div>
-                <button type="button" onclick="this.parentElement.remove()" class="text-red-500"><i data-lucide="x" class="lucide"></i></button>
-            `;
+                    <div style="flex:1;display:flex;flex-wrap:wrap;gap:8px;">
+                        <input type="text" placeholder="ناوی ئەکتەر" class="search-input" style="flex:1;min-width:100px;" value="${actor}">
+                        <input type="text" placeholder="لینکی وێنە" class="search-input" style="flex:1;min-width:100px;" value="${image}">
+                        <input type="text" placeholder="ناوی کاراکتەر" class="search-input" style="flex:1;min-width:100px;" value="${character}">
+                    </div>
+                    <button type="button" onclick="this.parentElement.remove()" class="text-red-500"><i data-lucide="x" class="lucide"></i></button>
+                `;
             container.appendChild(div);
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
@@ -3227,9 +3346,9 @@
             const div = document.createElement('div');
             div.className = 'sub-item';
             div.innerHTML = `
-                <input type="text" class="search-input" style="flex:1;min-width:150px;" placeholder="لینکی وێنەی فەرمی" value="${url}" />
-                <button type="button" onclick="this.parentElement.remove()" class="text-red-500"><i data-lucide="x" class="lucide"></i></button>
-            `;
+                    <input type="text" class="search-input" style="flex:1;min-width:150px;" placeholder="لینکی وێنەی فەرمی" value="${url}" />
+                    <button type="button" onclick="this.parentElement.remove()" class="text-red-500"><i data-lucide="x" class="lucide"></i></button>
+                `;
             container.appendChild(div);
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
@@ -3273,12 +3392,12 @@
                     const id = item.id;
                     const vote = item.vote_average ? item.vote_average.toFixed(1) : 'N/A';
                     html += `
-                        <div class="tmdb-search-result-item" onclick="selectTMDBResult(${id})">
-                            <img src="${poster}" alt="${title}">
-                            <div class="info"><div class="title">${title}</div><div class="sub">${year || 'N/A'} • ⭐ ${vote}</div></div>
-                            <span class="badge">هەڵبژێرە</span>
-                        </div>
-                    `;
+                            <div class="tmdb-search-result-item" onclick="selectTMDBResult(${id})">
+                                <img src="${poster}" alt="${title}">
+                                <div class="info"><div class="title">${title}</div><div class="sub">${year || 'N/A'} • ⭐ ${vote}</div></div>
+                                <span class="badge">هەڵبژێرە</span>
+                            </div>
+                        `;
                 });
                 resultsDiv.innerHTML = html;
                 statusDiv.textContent = `✅ ${data.results.length} ئەنجام دۆزرایەوە. یەکێک هەڵبژێرە.`;
@@ -3634,20 +3753,20 @@
                     `<span class="top250-badge">🏆 #${allTop250.find(t => String(t.content_id) === String(item.id) && t.content_type === item.type)?.rank || '?'} لە ٢٥٠ باشترین</span>` :
                     '';
                 card.innerHTML = `
-                    <img src="${poster}" onerror="this.src='https://via.placeholder.com/80x120/1a1a1a/7c3aed?text=No+Image'">
-                    <div class="info">
-                        <h3>${item.kurdish_title || item.title} <span class="text-sm text-gray-400">(${item.title})</span> ${top250Html}</h3>
-                        <div class="meta">جۆر: ${typeLabel} | ساڵ: ${item.release_date || '-'}</div>
-                        <div class="meta">⭐ IMDb: ${item.imdb_rating || '-'}</div>
-                        ${item.has_kurdish_subtitle ? '<span class="text-xs bg-green-900/20 text-green-400 px-2 py-0.5 rounded-full">ژێرنووسی کوردی هەیە</span>' : ''}
-                        ${item.website_ids && item.website_ids.length ? '<span class="text-xs bg-blue-900/20 text-blue-400 px-2 py-0.5 rounded-full">لە وێبسایتەکان بەردەستە</span>' : ''}
-                        ${item.writer ? `<span class="text-xs bg-amber-900/20 text-amber-400 px-2 py-0.5 rounded-full">نووسەر: ${item.writer}</span>` : ''}
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="editContent('${item.id}','${item._table}')" class="text-blue-400 hover:text-blue-300 text-lg px-2"><i data-lucide="edit" class="lucide"></i></button>
-                        <button onclick="deleteContent('${item.id}','${item._table}')" class="text-red-500 hover:text-red-400 text-lg px-2"><i data-lucide="trash" class="lucide"></i></button>
-                    </div>
-                `;
+                        <img src="${poster}" onerror="this.src='https://via.placeholder.com/80x120/1a1a1a/7c3aed?text=No+Image'">
+                        <div class="info">
+                            <h3>${item.kurdish_title || item.title} <span class="text-sm text-gray-400">(${item.title})</span> ${top250Html}</h3>
+                            <div class="meta">جۆر: ${typeLabel} | ساڵ: ${item.release_date || '-'}</div>
+                            <div class="meta">⭐ IMDb: ${item.imdb_rating || '-'}</div>
+                            ${item.has_kurdish_subtitle ? '<span class="text-xs bg-green-900/20 text-green-400 px-2 py-0.5 rounded-full">ژێرنووسی کوردی هەیە</span>' : ''}
+                            ${item.website_ids && item.website_ids.length ? '<span class="text-xs bg-blue-900/20 text-blue-400 px-2 py-0.5 rounded-full">لە وێبسایتەکان بەردەستە</span>' : ''}
+                            ${item.writer ? `<span class="text-xs bg-amber-900/20 text-amber-400 px-2 py-0.5 rounded-full">نووسەر: ${item.writer}</span>` : ''}
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="editContent('${item.id}','${item._table}')" class="text-blue-400 hover:text-blue-300 text-lg px-2"><i data-lucide="edit" class="lucide"></i></button>
+                            <button onclick="deleteContent('${item.id}','${item._table}')" class="text-red-500 hover:text-red-400 text-lg px-2"><i data-lucide="trash" class="lucide"></i></button>
+                        </div>
+                    `;
                 container.appendChild(card);
             });
             if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -3870,7 +3989,7 @@
             }
         })();
 
-        console.log('✅ KurdMDb Admin Panel - All features: Charts removed, text stats, activities/logs with filters');
+        console.log('✅ KurdMDb Admin Panel - Fixed: country/genre stats & collections display');
         console.log('📦 Connected to:', SUPABASE_URL);
     </script>
 </body>
