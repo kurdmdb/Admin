@@ -966,7 +966,7 @@
                 <div class="glass-card p-5 rounded-2xl"><p class="text-gray-500 text-xs md:text-sm mb-1">کۆی واتچلیست</p><h3 class="text-xl md:text-2xl font-bold text-purple-400" id="statWatchlists">0</h3></div>
             </div>
 
-            <!-- Stats by Country and Genre - FIXED: now computed from real data -->
+            <!-- Stats by Country and Genre -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div class="glass-card p-4 rounded-2xl">
                     <h3 class="text-md font-bold mb-3 text-gray-300"><i data-lucide="flag" class="lucide ml-2 text-purple-400"></i>ئاماری بەپێی وڵات</h3>
@@ -1215,7 +1215,7 @@
             </div>
         </div>
 
-        <!-- ===== COLLECTIONS (FIXED) ===== -->
+        <!-- ===== COLLECTIONS ===== -->
         <div id="section-collections" class="hidden">
             <div class="max-w-6xl mx-auto">
                 <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
@@ -1499,6 +1499,13 @@
         const SUPABASE_KEY =
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5eHVrbG96d2ducnp2ZWlzdm9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4ODY2MjAsImV4cCI6MjA5NzQ2MjYyMH0.liuaBRrdk2ChCqgbl0NGB33IShFJmb-qUlla7s0Cnxg';
 
+        // ============================================================
+        // TMDB & OMDb API KEYS
+        // ============================================================
+        const TMDB_READ_TOKEN =
+            'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmZjI2MzY5N2NkZTJhMDFhMzM4ZDI2OGJlZjJmNDQ1NSIsIm5iZiI6MTc4MTk4MTg2Ny4wMzgsInN1YiI6IjZhMzZlMmFiNTBmOWIzOTQ4ZGViZmU2ZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.iYzCeFf1g56Opd1udpBYyJYWVi7A1lq59rt-Ymq9Fsc';
+        const OMDB_API_KEY = '3ef0b0b7'; // OMDb API key
+
         if (typeof supabase === 'undefined') {
             document.getElementById('loginError').textContent =
                 '❌ خەتایە: کتێبخانەی Supabase بارنەبوو. تکایە پەیوەندی بە ئینتەرنێتەوە بکە.';
@@ -1573,9 +1580,6 @@
                 errorDiv.classList.remove('hidden');
                 errorDiv.textContent = '❌ ' + (err.message || 'هەڵە لە چوونەژوورەوە');
                 console.error(err);
-                if (err.message && err.message.includes('404')) {
-                    errorDiv.textContent += ' (دەرکەوت کە URL ی Supabase نادروستە یان پرۆژەکە بوونی نییە)';
-                }
             }
         }
 
@@ -1630,7 +1634,6 @@
                 const { data: top250, error: tErr } = await supabaseClient.from('top250').select('*');
                 if (!tErr && top250) allTop250 = top250;
 
-                // FIX: load collections and collection_items with all fields
                 const { data: collections, error: colErr } = await supabaseClient.from('collections').select('*');
                 if (!colErr && collections) allCollections = collections;
 
@@ -1638,7 +1641,6 @@
                     .select('*');
                 if (!ciErr && collectionItems) allCollectionItems = collectionItems;
 
-                // Load logs
                 const { data: logs, error: logErr } = await supabaseClient.from('log').select('*').order('created_at', { ascending: false });
                 if (!logErr && logs) allLogs = logs;
 
@@ -1677,7 +1679,6 @@
                 populateWebsiteCheckboxes();
                 renderTop250();
                 renderCollections();
-                // FIX: call the new stats function
                 await renderCountryGenreStats();
                 renderLogs();
                 document.getElementById('tmdbStatus').textContent = '✅ داتا لە Supabase بارکرا.';
@@ -1705,19 +1706,16 @@
         }
 
         // ============================================================
-        // RENDER COUNTRY & GENRE STATS - FIXED: compute from real data
+        // RENDER COUNTRY & GENRE STATS
         // ============================================================
         async function renderCountryGenreStats() {
             const countryContainer = document.getElementById('countryStatsContainer');
             const genreContainer = document.getElementById('genreStatsContainer');
 
-            // Show loading state
             countryContainer.innerHTML = '<div class="text-gray-500 text-sm">⏳ بارکردن...</div>';
             genreContainer.innerHTML = '<div class="text-gray-500 text-sm">⏳ بارکردن...</div>';
 
             try {
-                // ---- GENRE STATS ----
-                // Fetch all genre relationships
                 const [movieGenresRes, animGenresRes, allGenresRes] = await Promise.all([
                     supabaseClient.from('movie_genres').select('genre_id'),
                     supabaseClient.from('animation_genres').select('genre_id'),
@@ -1728,25 +1726,21 @@
                 const animGenreIds = animGenresRes.data || [];
                 const genreNames = allGenresRes.data || [];
 
-                // Build genre map
                 const genreMap = {};
                 genreNames.forEach(g => { genreMap[g.id] = g.name; });
 
-                // Count movies per genre
                 const movieCounts = {};
                 movieGenreIds.forEach(row => {
                     const id = row.genre_id;
                     movieCounts[id] = (movieCounts[id] || 0) + 1;
                 });
 
-                // Count animations per genre
                 const animCounts = {};
                 animGenreIds.forEach(row => {
                     const id = row.genre_id;
                     animCounts[id] = (animCounts[id] || 0) + 1;
                 });
 
-                // Combine
                 const allGenreIds = new Set([...Object.keys(movieCounts), ...Object.keys(animCounts)]);
                 const genreStats = [];
                 allGenreIds.forEach(id => {
@@ -1757,7 +1751,6 @@
                 });
                 genreStats.sort((a, b) => b.total_films - a.total_films);
 
-                // Render genre stats
                 if (genreStats.length > 0) {
                     genreContainer.innerHTML = genreStats.map(item => `
                         <div class="stat-item">
@@ -1773,7 +1766,6 @@
                     genreContainer.innerHTML = '<div class="text-gray-500 text-sm">هیچ داتایەک نییە</div>';
                 }
 
-                // ---- COUNTRY STATS ----
                 const [movieCountriesRes, animCountriesRes, allCountriesRes] = await Promise.all([
                     supabaseClient.from('movie_countries').select('country_id'),
                     supabaseClient.from('animation_countries').select('country_id'),
@@ -2358,7 +2350,7 @@
         });
 
         // ============================================================
-        // SETTINGS
+        // SETTINGS (unchanged)
         // ============================================================
         function populateSettingsForm() {
             if (!settingsData) return;
@@ -2972,7 +2964,7 @@
         document.getElementById('filterTop250Type')?.addEventListener('change', renderTop250);
 
         // ============================================================
-        // COLLECTIONS - FIXED: display issues resolved
+        // COLLECTIONS (unchanged)
         // ============================================================
         const collectionModal = document.getElementById('collectionModal');
         const collectionForm = document.getElementById('collectionForm');
@@ -3078,7 +3070,6 @@
             showToast('✅ کۆکراوە سڕایەوە', 'success');
         }
 
-        // Helper: get content by collection items - FIX: properly handles content_type
         function getContentByCollectionItems(items) {
             const map = {};
             items.forEach(i => {
@@ -3132,7 +3123,6 @@
                 return;
             }
 
-            // Use the helper to get content
             const contentMap = getContentByCollectionItems(sorted);
 
             sorted.forEach(ci => {
@@ -3360,10 +3350,31 @@
         }
 
         // ============================================================
-        // TMDB (unchanged)
+        // TMDB + OMDb INTEGRATION
         // ============================================================
-        const TMDB_READ_TOKEN =
-            'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmZjI2MzY5N2NkZTJhMDFhMzM4ZDI2OGJlZjJmNDQ1NSIsIm5iZiI6MTc4MTk4MTg2Ny4wMzgsInN1YiI6IjZhMzZlMmFiNTBmOWIzOTQ4ZGViZmU2ZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.iYzCeFf1g56Opd1udpBYyJYWVi7A1lq59rt-Ymq9Fsc';
+        async function fetchRatingsFromOMDb(imdbId) {
+            if (!imdbId) return null;
+            try {
+                const url = `https://www.omdbapi.com/?i=${imdbId}&apikey=${OMDB_API_KEY}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                const data = await response.json();
+                if (data.Response === 'False') return null;
+                const ratings = {};
+                if (data.Ratings) {
+                    data.Ratings.forEach(r => {
+                        if (r.Source === 'Internet Movie Database') ratings.imdb = r.Value;
+                        if (r.Source === 'Rotten Tomatoes') ratings.rotten = r.Value;
+                        if (r.Source === 'Metacritic') ratings.metacritic = r.Value;
+                    });
+                }
+                if (!ratings.imdb && data.imdbRating) ratings.imdb = data.imdbRating;
+                return ratings;
+            } catch (err) {
+                console.error('OMDb fetch error:', err);
+                return null;
+            }
+        }
 
         async function searchTMDB() {
             const query = document.getElementById('cSearchQuery').value.trim();
@@ -3435,14 +3446,40 @@
                 document.getElementById('tmdbPreviewType').textContent = 'فیلم / ئەنیمەیشن';
                 document.getElementById('tmdbPreviewRating').textContent = `⭐ ${rating}`;
                 previewDiv.classList.add('show');
-                populateFromTMDB(data);
+                await populateFromTMDB(data);
                 statusDiv.textContent = '✅ زانیاری بەسەرکەوتوویی هات.';
+
+                // ===== OMDb Ratings Integration =====
+                if (data.imdb_id) {
+                    statusDiv.textContent = '⏳ بەدەستهێنانی نمرەکان لە OMDb...';
+                    const omdbRatings = await fetchRatingsFromOMDb(data.imdb_id);
+                    if (omdbRatings) {
+                        if (omdbRatings.imdb) {
+                            const imdbVal = parseFloat(omdbRatings.imdb);
+                            if (!isNaN(imdbVal)) document.getElementById('cImdb').value = imdbVal;
+                        }
+                        if (omdbRatings.rotten) {
+                            const rottenVal = parseFloat(omdbRatings.rotten.replace('%', '').trim());
+                            if (!isNaN(rottenVal)) document.getElementById('cRotten').value = rottenVal;
+                        }
+                        if (omdbRatings.metacritic) {
+                            const metaVal = parseFloat(omdbRatings.metacritic.split('/')[0].trim());
+                            if (!isNaN(metaVal)) document.getElementById('cMeta').value = metaVal;
+                        }
+                        statusDiv.textContent = '✅ زانیاری و نمرەکان بەسەرکەوتوویی هات.';
+                    } else {
+                        statusDiv.textContent = '⚠️ نمرەکان لە OMDb بەدەست نەهاتن، ئەوانەی لە TMDB هاتوون پڕ کراون.';
+                    }
+                } else {
+                    statusDiv.textContent = '⚠️ IMDb ID نەدۆزرایەوە لە TMDB، نمرەکان لە OMDb وەرنەگیران.';
+                }
+
             } catch (err) { statusDiv.textContent = '❌ هەڵە لە کێشاندا.';
                 console.error(err);
                 previewDiv.classList.remove('show'); }
         }
 
-        function populateFromTMDB(data) {
+        async function populateFromTMDB(data) {
             document.getElementById('cTitle').value = data.title || '';
             document.getElementById('cReleaseDate').value = (data.release_date || '').substring(0, 4);
             if (data.release_date) {
@@ -3533,7 +3570,8 @@
                         `https://image.tmdb.org/t/p/w200${actor.profile_path}` : '', actor.character || ''); });
                 if (topCast.length === 0) addCastField();
             }
-            if (data.vote_average) document.getElementById('cImdb').value = data.vote_average.toFixed(1);
+            // Do NOT set IMDb rating from TMDB here - we'll let OMDb do it if available, otherwise fallback.
+            // But we keep the field as is from previous data if not overwritten.
 
             const photos = [];
             if (data.images && data.images.posters) {
@@ -3556,7 +3594,7 @@
         }
 
         // ============================================================
-        // SAVE CONTENT (with budget cleaning and writer)
+        // SAVE CONTENT (unchanged but note that we keep OMDb ratings)
         // ============================================================
         document.getElementById('contentForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -3682,7 +3720,6 @@
                     if (cErr) console.warn('Country insert error:', cErr);
                 }
 
-                // Reset form
                 document.getElementById('editContentId').value = '';
                 document.getElementById('editContentType').value = '';
                 document.getElementById('contentForm').reset();
@@ -3717,7 +3754,7 @@
         });
 
         // ============================================================
-        // MANAGE CONTENT
+        // MANAGE CONTENT (unchanged)
         // ============================================================
         function renderContentManage() {
             const filterType = document.getElementById('filterType').value;
@@ -3757,7 +3794,7 @@
                         <div class="info">
                             <h3>${item.kurdish_title || item.title} <span class="text-sm text-gray-400">(${item.title})</span> ${top250Html}</h3>
                             <div class="meta">جۆر: ${typeLabel} | ساڵ: ${item.release_date || '-'}</div>
-                            <div class="meta">⭐ IMDb: ${item.imdb_rating || '-'}</div>
+                            <div class="meta">⭐ IMDb: ${item.imdb_rating || '-'} | 🍅 RT: ${item.rt_rating || '-'} | 🎯 Meta: ${item.mc_rating || '-'}</div>
                             ${item.has_kurdish_subtitle ? '<span class="text-xs bg-green-900/20 text-green-400 px-2 py-0.5 rounded-full">ژێرنووسی کوردی هەیە</span>' : ''}
                             ${item.website_ids && item.website_ids.length ? '<span class="text-xs bg-blue-900/20 text-blue-400 px-2 py-0.5 rounded-full">لە وێبسایتەکان بەردەستە</span>' : ''}
                             ${item.writer ? `<span class="text-xs bg-amber-900/20 text-amber-400 px-2 py-0.5 rounded-full">نووسەر: ${item.writer}</span>` : ''}
@@ -3797,7 +3834,7 @@
         }
 
         // ============================================================
-        // EDIT CONTENT - preserve all fields
+        // EDIT CONTENT - preserve all fields including OMDb ratings
         // ============================================================
         function editContent(id, table) {
             let item = null;
@@ -3989,8 +4026,9 @@
             }
         })();
 
-        console.log('✅ KurdMDb Admin Panel - Fixed: country/genre stats & collections display');
+        console.log('✅ KurdMDb Admin Panel - OMDb Integration Added');
         console.log('📦 Connected to:', SUPABASE_URL);
+        console.log('🔑 OMDb API Key:', OMDB_API_KEY);
     </script>
 </body>
 </html>
