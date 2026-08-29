@@ -2316,10 +2316,11 @@
         let allGenres = [];
         let allCountries = [];
         // Lookup maps built in buildContentFilterLookups() from the movie_genres /
-        // animation_genres / movie_countries / animation_countries join tables, keyed by
-        // "type:id" (e.g. "movie:42") -> Set of genre_id / country_id. Used only by the
-        // manage-content filter bar (filterGenre / filterCountry), so content list items
-        // don't need genre/country ids merged onto them directly.
+        // animation_genres / anime_genres / movie_countries / animation_countries /
+        // anime_countries join tables, keyed by "type:id" (e.g. "movie:42") -> Set of
+        // genre_id / country_id. Used only by the manage-content filter bar
+        // (filterGenre / filterCountry), so content list items don't need genre/country
+        // ids merged onto them directly.
         let contentGenreMap = {};
         let contentCountryMap = {};
         let allHeroSlides = [];
@@ -2563,7 +2564,8 @@
                 // `!error && data` before assigning, identical field names throughout.
                 const [
                     profilesRes, moviesRes, animationsRes, animeRes, genresRes, countriesRes,
-                    movieGenresJoin, animGenresJoin, movieCountriesJoin, animCountriesJoin,
+                    movieGenresJoin, animGenresJoin, animeGenresJoin,
+                    movieCountriesJoin, animCountriesJoin, animeCountriesJoin,
                     heroesRes, adsRes, commentsRes, websitesRes, top250Res, top250AnimeRes,
                     collectionsRes, collectionItemsRes, actorsRes, companiesRes, releaseCalRes,
                     logsRes, statsRes, settingsRes, rolesRes, rolePermsRes
@@ -2575,13 +2577,15 @@
                     supabaseClient.from('genres').select('*'),
                     supabaseClient.from('countries').select('*'),
                     // Join-table rows for the manage-content filter bar (filterGenre/filterCountry).
-                    // animation_genres/animation_countries are shared between `animation` and `anime`
-                    // rows (see buildContentFilterLookups() for the split), matching the same schema
-                    // note already documented above renderCountryGenreStats().
+                    // movie/animation/anime each have their own dedicated join tables -
+                    // anime_genres/anime_countries are fetched separately below rather than
+                    // split out of animation_genres/animation_countries.
                     supabaseClient.from('movie_genres').select('movie_id, genre_id'),
                     supabaseClient.from('animation_genres').select('animation_id, genre_id'),
+                    supabaseClient.from('anime_genres').select('anime_id, genre_id'),
                     supabaseClient.from('movie_countries').select('movie_id, country_id'),
                     supabaseClient.from('animation_countries').select('animation_id, country_id'),
+                    supabaseClient.from('anime_countries').select('anime_id, country_id'),
                     supabaseClient.from('hero_slides').select('*'),
                     supabaseClient.from('ads').select('*'),
                     supabaseClient.from('comments').select('*'),
@@ -2636,7 +2640,9 @@
 
                 buildContentFilterLookups(
                     unwrap(movieGenresJoin).data || [], unwrap(animGenresJoin).data || [],
-                    unwrap(movieCountriesJoin).data || [], unwrap(animCountriesJoin).data || []
+                    unwrap(animeGenresJoin).data || [],
+                    unwrap(movieCountriesJoin).data || [], unwrap(animCountriesJoin).data || [],
+                    unwrap(animeCountriesJoin).data || []
                 );
 
                 const { data: heroes, error: hErr } = unwrap(heroesRes);
@@ -2852,12 +2858,10 @@
         // so renderContentManage() can filter by genre/country without a join query per
         // render. Uses the same animation_genres/animation_countries anime-vs-animation
         // split as renderCountryGenreStats() below, for the same schema reason.
-        function buildContentFilterLookups(movieGenreRows, animGenreRows, movieCountryRows, animCountryRows) {
+        function buildContentFilterLookups(movieGenreRows, animGenreRows, animeGenreRows, movieCountryRows,
+            animCountryRows, animeCountryRows) {
             contentGenreMap = {};
             contentCountryMap = {};
-
-            const animeIdSet = new Set(allAnime.map(a => String(a.id)));
-            const animationIdSet = new Set(allAnimations.map(a => String(a.id)));
 
             movieGenreRows.forEach(row => {
                 const key = `movie:${row.movie_id}`;
@@ -2865,9 +2869,12 @@
                 contentGenreMap[key].add(String(row.genre_id));
             });
             animGenreRows.forEach(row => {
-                const idStr = String(row.animation_id);
-                const type = (animeIdSet.has(idStr) && !animationIdSet.has(idStr)) ? 'anime' : 'animation';
-                const key = `${type}:${row.animation_id}`;
+                const key = `animation:${row.animation_id}`;
+                if (!contentGenreMap[key]) contentGenreMap[key] = new Set();
+                contentGenreMap[key].add(String(row.genre_id));
+            });
+            animeGenreRows.forEach(row => {
+                const key = `anime:${row.anime_id}`;
                 if (!contentGenreMap[key]) contentGenreMap[key] = new Set();
                 contentGenreMap[key].add(String(row.genre_id));
             });
@@ -2878,9 +2885,12 @@
                 contentCountryMap[key].add(String(row.country_id));
             });
             animCountryRows.forEach(row => {
-                const idStr = String(row.animation_id);
-                const type = (animeIdSet.has(idStr) && !animationIdSet.has(idStr)) ? 'anime' : 'animation';
-                const key = `${type}:${row.animation_id}`;
+                const key = `animation:${row.animation_id}`;
+                if (!contentCountryMap[key]) contentCountryMap[key] = new Set();
+                contentCountryMap[key].add(String(row.country_id));
+            });
+            animeCountryRows.forEach(row => {
+                const key = `anime:${row.anime_id}`;
                 if (!contentCountryMap[key]) contentCountryMap[key] = new Set();
                 contentCountryMap[key].add(String(row.country_id));
             });
@@ -2905,30 +2915,17 @@
             genreContainer.innerHTML = '<div class="text-gray-500 text-sm">⏳ بارکردن...</div>';
 
             try {
-                const [movieGenresRes, animGenresRes, allGenresRes] = await Promise.all([
+                const [movieGenresRes, animGenresRes, animeGenresRes, allGenresRes] = await Promise.all([
                     supabaseClient.from('movie_genres').select('genre_id'),
-                    supabaseClient.from('animation_genres').select('genre_id, animation_id'),
+                    supabaseClient.from('animation_genres').select('genre_id'),
+                    supabaseClient.from('anime_genres').select('genre_id'),
                     supabaseClient.from('genres').select('id, name')
                 ]);
 
                 const movieGenreIds = movieGenresRes.data || [];
-                const sharedGenreRows = animGenresRes.data || [];
+                const animGenreIds = animGenresRes.data || [];
+                const animeGenreIds = animeGenresRes.data || [];
                 const genreNames = allGenresRes.data || [];
-
-                // Split the shared animation_genres rows into real-animation vs anime,
-                // based on which local id set their animation_id actually belongs to.
-                const animeIdSet = new Set(allAnime.map(a => String(a.id)));
-                const animationIdSet = new Set(allAnimations.map(a => String(a.id)));
-                const animGenreIds = [];
-                const animeGenreIds = [];
-                sharedGenreRows.forEach(row => {
-                    const key = String(row.animation_id);
-                    if (animeIdSet.has(key) && !animationIdSet.has(key)) {
-                        animeGenreIds.push(row);
-                    } else {
-                        animGenreIds.push(row);
-                    }
-                });
 
                 const genreMap = {};
                 genreNames.forEach(g => { genreMap[g.id] = g.name; });
@@ -2980,26 +2977,17 @@
                     genreContainer.innerHTML = '<div class="text-gray-500 text-sm">هیچ داتایەک نییە</div>';
                 }
 
-                const [movieCountriesRes, animCountriesRes, allCountriesRes] = await Promise.all([
+                const [movieCountriesRes, animCountriesRes, animeCountriesRes, allCountriesRes] = await Promise.all([
                     supabaseClient.from('movie_countries').select('country_id'),
-                    supabaseClient.from('animation_countries').select('country_id, animation_id'),
+                    supabaseClient.from('animation_countries').select('country_id'),
+                    supabaseClient.from('anime_countries').select('country_id'),
                     supabaseClient.from('countries').select('id, name')
                 ]);
 
                 const movieCountryIds = movieCountriesRes.data || [];
-                const sharedCountryRows = animCountriesRes.data || [];
+                const animCountryIds = animCountriesRes.data || [];
+                const animeCountryIds = animeCountriesRes.data || [];
                 const countryNames = allCountriesRes.data || [];
-
-                const animCountryIds = [];
-                const animeCountryIds = [];
-                sharedCountryRows.forEach(row => {
-                    const key = String(row.animation_id);
-                    if (animeIdSet.has(key) && !animationIdSet.has(key)) {
-                        animeCountryIds.push(row);
-                    } else {
-                        animCountryIds.push(row);
-                    }
-                });
 
                 const countryMap = {};
                 countryNames.forEach(c => { countryMap[c.id] = c.name; });
@@ -7250,9 +7238,24 @@
             }
 
             if (data.staff && data.staff.edges && data.staff.edges.length > 0) {
+                // Mirrors the TMDb path above: director and writer are two separate
+                // roles that must land in their own fields. The previous version only
+                // searched for the director role but wrote the result into cWriter,
+                // so cDirector was left blank (saved as empty/null) and cWriter ended
+                // up holding the director's name instead of an actual writer's.
                 const directorEdge = data.staff.edges.find(e => (e.role || '').toLowerCase().includes('director'));
                 if (directorEdge) {
                     const idx = data.staff.edges.indexOf(directorEdge);
+                    const name = data.staff.nodes[idx] && data.staff.nodes[idx].name && data.staff.nodes[idx].name.full;
+                    if (name) document.getElementById('cDirector').value = name;
+                }
+                const writerEdge = data.staff.edges.find(e => {
+                    const role = (e.role || '').toLowerCase();
+                    return role.includes('script') || role.includes('writer') || role.includes('series composition') ||
+                        role.includes('screenplay') || role.includes('story');
+                });
+                if (writerEdge) {
+                    const idx = data.staff.edges.indexOf(writerEdge);
                     const name = data.staff.nodes[idx] && data.staff.nodes[idx].name && data.staff.nodes[idx].name.full;
                     if (name) document.getElementById('cWriter').value = name;
                 }
@@ -7838,10 +7841,16 @@
                 const selectedCountries = [];
                 document.querySelectorAll('.country-check:checked').forEach(cb => selectedCountries.push(cb.value));
 
-                // NOTE: anime rows also use animation_genres/animation_countries (animation_id column),
-                // per the decision to share join tables between 'animation' and 'anime' content.
-                const joinTable = type === 'movie' ? 'movie_genres' : 'animation_genres';
-                const idField = type === 'movie' ? 'movie_id' : 'animation_id';
+                // Each content type has its own genre/country join tables and FK column
+                // name: movie_genres(movie_id), animation_genres(animation_id),
+                // anime_genres(anime_id). The public site's fetchAnime() only ever reads
+                // anime_genres/anime_countries, so anime selections must be written there -
+                // writing them to animation_genres/animation_countries (as before) meant
+                // they never linked back to the anime record, which is why they always
+                // came back empty on the next edit despite being "saved".
+                const joinTable = type === 'movie' ? 'movie_genres' : type === 'anime' ? 'anime_genres' :
+                    'animation_genres';
+                const idField = type === 'movie' ? 'movie_id' : type === 'anime' ? 'anime_id' : 'animation_id';
 
                 await supabaseClient.from(joinTable).delete().eq(idField, contentId);
                 if (selectedGenres.length > 0) {
@@ -7850,8 +7859,9 @@
                     if (gErr) console.warn('Genre insert error:', gErr);
                 }
 
-                const countryJoinTable = type === 'movie' ? 'movie_countries' : 'animation_countries';
-                const countryIdField = type === 'movie' ? 'movie_id' : 'animation_id';
+                const countryJoinTable = type === 'movie' ? 'movie_countries' : type === 'anime' ? 'anime_countries' :
+                    'animation_countries';
+                const countryIdField = type === 'movie' ? 'movie_id' : type === 'anime' ? 'anime_id' : 'animation_id';
                 await supabaseClient.from(countryJoinTable).delete().eq(countryIdField, contentId);
                 if (selectedCountries.length > 0) {
                     const countryInserts = selectedCountries.map(cid => ({ [countryIdField]: contentId,
@@ -7864,16 +7874,21 @@
                 // refresh the manage-content filter lookup maps (built once in loadAllData)
                 // so filterGenre/filterCountry reflect this save immediately, not just after
                 // the next full page reload.
-                const [refreshedMovieGenres, refreshedAnimGenres, refreshedMovieCountries, refreshedAnimCountries] =
-                    await Promise.all([
-                        supabaseClient.from('movie_genres').select('movie_id, genre_id'),
-                        supabaseClient.from('animation_genres').select('animation_id, genre_id'),
-                        supabaseClient.from('movie_countries').select('movie_id, country_id'),
-                        supabaseClient.from('animation_countries').select('animation_id, country_id')
-                    ]);
+                const [
+                    refreshedMovieGenres, refreshedAnimGenres, refreshedAnimeGenres,
+                    refreshedMovieCountries, refreshedAnimCountries, refreshedAnimeCountries
+                ] = await Promise.all([
+                    supabaseClient.from('movie_genres').select('movie_id, genre_id'),
+                    supabaseClient.from('animation_genres').select('animation_id, genre_id'),
+                    supabaseClient.from('anime_genres').select('anime_id, genre_id'),
+                    supabaseClient.from('movie_countries').select('movie_id, country_id'),
+                    supabaseClient.from('animation_countries').select('animation_id, country_id'),
+                    supabaseClient.from('anime_countries').select('anime_id, country_id')
+                ]);
                 buildContentFilterLookups(
-                    refreshedMovieGenres.data || [], refreshedAnimGenres.data || [],
-                    refreshedMovieCountries.data || [], refreshedAnimCountries.data || []
+                    refreshedMovieGenres.data || [], refreshedAnimGenres.data || [], refreshedAnimeGenres.data || [],
+                    refreshedMovieCountries.data || [], refreshedAnimCountries.data || [],
+                    refreshedAnimeCountries.data || []
                 );
 
                 document.getElementById('editContentId').value = '';
@@ -8175,8 +8190,9 @@
                 });
             }
 
-            const joinTable = item.type === 'movie' ? 'movie_genres' : 'animation_genres';
-            const idField = item.type === 'movie' ? 'movie_id' : 'animation_id';
+            const joinTable = item.type === 'movie' ? 'movie_genres' : item.type === 'anime' ? 'anime_genres' :
+                'animation_genres';
+            const idField = item.type === 'movie' ? 'movie_id' : item.type === 'anime' ? 'anime_id' : 'animation_id';
             supabaseClient.from(joinTable).select('genre_id').eq(idField, id).then(({ data }) => {
                 if (data) {
                     data.forEach(row => {
@@ -8193,8 +8209,10 @@
                 }
             });
 
-            const countryJoinTable = item.type === 'movie' ? 'movie_countries' : 'animation_countries';
-            const countryIdField = item.type === 'movie' ? 'movie_id' : 'animation_id';
+            const countryJoinTable = item.type === 'movie' ? 'movie_countries' : item.type === 'anime' ?
+                'anime_countries' : 'animation_countries';
+            const countryIdField = item.type === 'movie' ? 'movie_id' : item.type === 'anime' ? 'anime_id' :
+                'animation_id';
             supabaseClient.from(countryJoinTable).select('country_id').eq(countryIdField, id).then(({ data }) => {
                 if (data) {
                     data.forEach(row => {
