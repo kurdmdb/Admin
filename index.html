@@ -5720,10 +5720,7 @@
 
             document.getElementById('cJapaneseTitleWrap').style.display = isAnime ? 'block' : 'none';
             document.getElementById('cDemographicWrap').style.display = isAnime ? 'block' : 'none';
-            document.getElementById('cWriterWrap').style.display = isAnime ? 'none' : 'block';
-
             document.getElementById('cSourceWrap').style.display = isAnime ? 'block' : 'none';
-            document.getElementById('cDirectorWrap').style.display = isAnime ? 'none' : 'block';
             document.getElementById('cBudgetWrap').style.display = isAnime ? 'none' : 'block';
 
             document.getElementById('genresTextLabel').textContent = isAnime ? 'ژانەرەکان (لە Anilist)' :
@@ -5734,13 +5731,11 @@
             document.getElementById('castLabel').textContent = isAnime ? 'ئەکتەر و کارەکتەرەکان' : 'ئەکتەرەکان';
             document.getElementById('cVoiceCastWrap').style.display = isAnime ? 'block' : 'none';
 
-            document.getElementById('cRottenWrap').style.display = isAnime ? 'none' : 'block';
-            document.getElementById('cMetaWrap').style.display = isAnime ? 'none' : 'block';
             document.getElementById('cAnilistRatingWrap').style.display = isAnime ? 'block' : 'none';
             document.getElementById('cAnilistTop250Wrap').style.display = isAnime ? 'block' : 'none';
 
             document.getElementById('galleryHint').textContent = isAnime ?
-                'کاتی ڕاکێشان لە Anilist، پۆستەر و وێنەی پشتەوە بەخۆکار زیاد دەکرێن. باشترە screenshotـی ڕاستەقینەی ناو ئەنیمیەکە بەدەستی زیاد بکەیت، بەلاڵ زیاتر بێت باشترە.' :
+                'کاتی ڕاکێشان لە Anilist، پۆستەر و وێنەی پشتەوەی Anilist و پۆستەر/باگراوندەکانی TMDb پێکەوە بەخۆکار پڕدەکرێنەوە. باشترە screenshotـی ڕاستەقینەی ناو ئەنیمیەکە بەدەستی زیاد بکەیت، بەلاڵ زیاتر بێت باشترە.' :
                 'لینکی وێنە، بەلاڵ زیاتر بێت باشترە.';
 
             syncRelatedContentRelationOptions();
@@ -5759,20 +5754,51 @@
                 if (!response.ok) throw new Error('HTTP ' + response.status);
                 const data = await response.json();
                 if (data.Response === 'False') return null;
-                const ratings = {};
-                if (data.Ratings) {
-                    data.Ratings.forEach(r => {
-                        if (r.Source === 'Internet Movie Database') ratings.imdb = r.Value;
-                        if (r.Source === 'Rotten Tomatoes') ratings.rotten = r.Value;
-                        if (r.Source === 'Metacritic') ratings.metacritic = r.Value;
-                    });
-                }
-                if (!ratings.imdb && data.imdbRating) ratings.imdb = data.imdbRating;
-                return ratings;
+                return _parseOMDbRatings(data);
             } catch (err) {
                 console.error('OMDb fetch error:', err);
                 return null;
             }
+        }
+
+        // Anime has no TMDB/imdb_id the way movies/animations do - Anilist's API
+        // simply doesn't expose one - so IMDb/Rotten Tomatoes/Metacritic for anime
+        // can only be reached by asking OMDb for the title directly (OMDb's `t=`
+        // param, same site/data as fetchRatingsFromOMDb above, just a different
+        // lookup key). `year` is optional but passed whenever known (Anilist's
+        // startDate.year) since it disambiguates same-titled shows/remakes, exactly
+        // like the movie flow already disambiguates via TMDb's own numeric ID.
+        // Returns the same {imdb, rotten, metacritic} shape as fetchRatingsFromOMDb,
+        // or null on no-match/network failure, so callers can treat both the same way.
+        async function fetchRatingsFromOMDbByTitle(title, year) {
+            if (!title) return null;
+            try {
+                let url = `https://www.omdbapi.com/?t=${encodeURIComponent(title)}&apikey=${OMDB_API_KEY}`;
+                if (year) url += `&y=${encodeURIComponent(year)}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                const data = await response.json();
+                if (data.Response === 'False') return null;
+                return _parseOMDbRatings(data);
+            } catch (err) {
+                console.error('OMDb fetch-by-title error:', err);
+                return null;
+            }
+        }
+
+        // Shared by both OMDb lookups above (by imdb id / by title) so the
+        // Source-name-to-field mapping only lives in one place.
+        function _parseOMDbRatings(data) {
+            const ratings = {};
+            if (data.Ratings) {
+                data.Ratings.forEach(r => {
+                    if (r.Source === 'Internet Movie Database') ratings.imdb = r.Value;
+                    if (r.Source === 'Rotten Tomatoes') ratings.rotten = r.Value;
+                    if (r.Source === 'Metacritic') ratings.metacritic = r.Value;
+                });
+            }
+            if (!ratings.imdb && data.imdbRating) ratings.imdb = data.imdbRating;
+            return ratings;
         }
 
         // Awards API (awardsapi.com) - see AWARDS_API_BASE/AWARDS_API_KEY note above for
@@ -7092,7 +7118,7 @@
                             popularity
                             favourites
                             studios(isMain: true) { nodes { name } }
-                            staff(perPage: 5) { edges { role } nodes { name { full } } }
+                            staff(perPage: 15) { edges { role } nodes { name { full } } }
                             characters(perPage: 8, sort: ROLE) {
                                 edges {
                                     role
@@ -7129,36 +7155,105 @@
                 await populateFromAnilist(media);
                 statusDiv.textContent = '✅ زانیاری بەسەرکەوتوویی هات لە Anilist.';
 
-                // ===== Awards API Integration (see AWARDS_API_BASE/AWARDS_API_KEY note
-                // above populateFromTMDB's awards block) =====
-                // Same title-match-within-year approach as the movie flow. Anime TV
-                // series realistically won't match, since the ceremonies this API covers
-                // are typically film-only - that's a real gap in the underlying data, not
-                // something this lookup can fix. A miss just means no rows get
-                // auto-filled and manual entry (addAwardField) stays exactly as available.
-                if (title && title !== 'N/A' && year && year !== 'N/A') {
-                    const anilistAwardsContainer = document.getElementById('awardsContainer');
-                    if (anilistAwardsContainer && anilistAwardsContainer.children.length === 0) {
-                        try {
-                            statusDiv.textContent = '⏳ گەڕان بۆ خەڵاتەکان...';
-                            const fetchedAwards = await fetchAwardsFromAwardsAPI(title, year);
-                            if (fetchedAwards.length > 0) {
-                                fetchedAwards.forEach(a => addAwardField(a.name, a.category, a.year));
-                                showToast(`✅ ${fetchedAwards.length} خەڵات بەخۆکار پڕکرایەوە`, 'success');
-                                statusDiv.textContent = '✅ زانیاری و خەڵاتەکان بەسەرکەوتوویی هاتن لە Anilist.';
-                            } else {
-                                statusDiv.textContent = '✅ زانیاری هات لە Anilist. (هیچ خەڵاتێک نەدۆزرایەوە بۆ ئەم ناونیشانە - دەتوانیت بەدەستی زیادی بکەیت)';
-                            }
-                        } catch (awardsErr) {
-                            console.error('Awards API fetch error:', awardsErr);
-                            showToast(`⚠️ خەڵاتەکان بەخۆکار پڕنەکرانەوە: ${awardsErr.message}`, 'error');
+                // Awards are no longer auto-fetched for anime - the admin adds them by
+                // hand via addAwardField. (The movie/animation flow's Awards API call in
+                // fetchFromTMDB is unaffected by this; this removal is anime-only.)
+
+                // ===== OMDb Ratings Integration (anime) =====
+                // Mirrors fetchFromTMDB's OMDb step, but Anilist never gives an
+                // imdb_id the way TMDb does, so this looks OMDb up by title+year
+                // instead (fetchRatingsFromOMDbByTitle, defined next to the
+                // original imdb_id version above). Only fills fields that are
+                // still empty, so it never overwrites a rating the admin already
+                // typed by hand or a previous fetch.
+                if (title && title !== 'N/A') {
+                    statusDiv.textContent = '⏳ گەڕان بۆ نمرەکان لە OMDb...';
+                    const omdbYear = (year && year !== 'N/A') ? year : undefined;
+                    const anilistOmdbRatings = await fetchRatingsFromOMDbByTitle(title, omdbYear);
+                    if (anilistOmdbRatings) {
+                        const imdbField = document.getElementById('cImdb');
+                        const rottenField = document.getElementById('cRotten');
+                        const metaField = document.getElementById('cMeta');
+                        if (anilistOmdbRatings.imdb && imdbField && !imdbField.value.trim()) {
+                            const imdbVal = parseFloat(anilistOmdbRatings.imdb);
+                            if (!isNaN(imdbVal)) imdbField.value = imdbVal;
                         }
+                        if (anilistOmdbRatings.rotten && rottenField && !rottenField.value.trim()) {
+                            const rottenVal = parseFloat(anilistOmdbRatings.rotten.replace('%', '').trim());
+                            if (!isNaN(rottenVal)) rottenField.value = rottenVal;
+                        }
+                        if (anilistOmdbRatings.metacritic && metaField && !metaField.value.trim()) {
+                            const metaVal = parseFloat(anilistOmdbRatings.metacritic.split('/')[0].trim());
+                            if (!isNaN(metaVal)) metaField.value = metaVal;
+                        }
+                        statusDiv.textContent = '✅ زانیاری و نمرەکان بەسەرکەوتوویی هاتن لە Anilist و OMDb.';
+                    } else {
+                        statusDiv.textContent = '✅ زانیاری هات لە Anilist. (نمرەی OMDb بۆ ئەم ناونیشانە نەدۆزرایەوە - دەتوانیت بەدەستی زیادی بکەیت)';
                     }
                 }
             } catch (err) {
                 statusDiv.textContent = '❌ هەڵە لە کێشاندا: ' + err.message;
                 console.error(err);
                 previewDiv.classList.remove('show');
+            }
+        }
+
+        // Primary TMDb image source for the anime gallery: Anilist only ever supplies
+        // a poster + banner (2 images) for a title, with no in-episode screenshots and
+        // no posters/backdrops collection. This searches TMDb by the anime's title
+        // (search/multi filtered to movie+tv, same combined-search shape already used
+        // by searchRcTmdb for the release calendar, since anime can land under either
+        // TMDb media type) and pulls that title's own posters/backdrops - real images
+        // of the anime itself. Runs on every anime fetch now rather than as a rare
+        // fallback, so the match is picked by exact (case-insensitive) title against
+        // the movie/tv candidates rather than just taking search/multi's first hit -
+        // relevance-ranked order can occasionally put an unrelated same-ish-named
+        // result first (e.g. a live-action adaptation), and a wrong match would now
+        // surface far more often than when this only ran on rare Anilist misses. Falls
+        // back to the first movie/tv candidate only when nothing matches exactly,
+        // since TMDb's title field can still differ slightly (subtitle, punctuation)
+        // from Anilist's romaji/english title even for the correct match. Returns a
+        // plain array of image URLs (possibly empty if no TMDb match exists), never
+        // throws - a miss here should just mean "fewer gallery images", not a broken
+        // Anilist fetch.
+        async function fetchAnimeGalleryFromTMDb(title) {
+            if (!title) return [];
+            try {
+                const searchUrl =
+                    `https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(title)}&include_adult=false&language=en-US&page=1`;
+                const searchRes = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${TMDB_READ_TOKEN}`,
+                        'Accept': 'application/json' } });
+                if (!searchRes.ok) throw new Error('HTTP ' + searchRes.status);
+                const searchData = await searchRes.json();
+                const candidates = (searchData.results || []).filter(r => r.media_type === 'movie' || r.media_type ===
+                    'tv');
+                if (candidates.length === 0) return [];
+                const titleLower = title.trim().toLowerCase();
+                const exactMatch = candidates.find(r => ((r.title || r.name || '').trim().toLowerCase()) ===
+                    titleLower);
+                const match = exactMatch || candidates[0];
+                const endpoint = match.media_type === 'tv' ? 'tv' : 'movie';
+                const detailUrl =
+                    `https://api.themoviedb.org/3/${endpoint}/${match.id}?append_to_response=images&include_image_language=en,null`;
+                const detailRes = await fetch(detailUrl, { headers: { 'Authorization': `Bearer ${TMDB_READ_TOKEN}`,
+                        'Accept': 'application/json' } });
+                if (!detailRes.ok) throw new Error('HTTP ' + detailRes.status);
+                const detailData = await detailRes.json();
+                const tmdbPhotos = [];
+                if (detailData.images && detailData.images.posters) {
+                    detailData.images.posters.slice(0, 5).forEach(p => {
+                        tmdbPhotos.push(`https://image.tmdb.org/t/p/w500${p.file_path}`);
+                    });
+                }
+                if (detailData.images && detailData.images.backdrops) {
+                    detailData.images.backdrops.slice(0, 3).forEach(b => {
+                        tmdbPhotos.push(`https://image.tmdb.org/t/p/w500${b.file_path}`);
+                    });
+                }
+                return tmdbPhotos;
+            } catch (err) {
+                console.error('TMDb anime-gallery fetch error:', err);
+                return [];
             }
         }
 
@@ -7249,15 +7344,31 @@
                     const name = data.staff.nodes[idx] && data.staff.nodes[idx].name && data.staff.nodes[idx].name.full;
                     if (name) document.getElementById('cDirector').value = name;
                 }
-                const writerEdge = data.staff.edges.find(e => {
+                // All matching writer/script-role staff (not just the first) - mirrors
+                // populateFromTMDB's writers block below, which was the one actually
+                // filling writersContainer for movies/animations. This function was only
+                // ever writing the single cWriter text field above and never touched
+                // writersContainer at all, so the repeatable "نووسەرەکان" list stayed on
+                // its one empty placeholder row for every anime, regardless of what
+                // Anilist actually had. cWriter is still set from the first match for
+                // backward compatibility with anything reading that single field.
+                const writerEdges = data.staff.edges.filter((e, i) => {
                     const role = (e.role || '').toLowerCase();
                     return role.includes('script') || role.includes('writer') || role.includes('series composition') ||
                         role.includes('screenplay') || role.includes('story');
                 });
-                if (writerEdge) {
-                    const idx = data.staff.edges.indexOf(writerEdge);
-                    const name = data.staff.nodes[idx] && data.staff.nodes[idx].name && data.staff.nodes[idx].name.full;
-                    if (name) document.getElementById('cWriter').value = name;
+                if (writerEdges.length > 0) {
+                    const idx0 = data.staff.edges.indexOf(writerEdges[0]);
+                    const name0 = data.staff.nodes[idx0] && data.staff.nodes[idx0].name && data.staff.nodes[idx0].name.full;
+                    if (name0) document.getElementById('cWriter').value = name0;
+
+                    const writerNames = writerEdges.map(e => {
+                        const idx = data.staff.edges.indexOf(e);
+                        return data.staff.nodes[idx] && data.staff.nodes[idx].name && data.staff.nodes[idx].name.full;
+                    }).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+                    document.getElementById('writersContainer').innerHTML = '';
+                    if (writerNames.length > 0) writerNames.forEach(w => addWriterField(w));
+                    else addWriterField();
                 }
             }
 
@@ -7298,21 +7409,49 @@
                 });
             }
 
-            // Gallery auto-fill: Anilist's API has no in-episode screenshots (only
-            // poster/banner/character art) - that hasn't changed. This used to mean the
-            // gallery was left untouched entirely, but the poster (coverImage) and
-            // backdrop (bannerImage) are still real images for the title, same idea as
-            // the movie/animation flow's photos.posters + photos.backdrops. Only fills
-            // when the gallery is still empty, so it never overwrites hand-typed
-            // screenshots or a previous fetch - if you already added real screenshots,
-            // they're untouched either way.
+            // Gallery auto-fill: Anilist's API only ever supplies up to 2 images for a
+            // title (poster via coverImage + banner via bannerImage) - it has no
+            // in-episode screenshots and no posters/backdrops collection the way TMDb
+            // does. Those 2 Anilist images go in first since they're guaranteed to be
+            // the right title. Character/voice-actor portraits are deliberately NOT
+            // used here - those are headshot-style images of individual characters or
+            // voice actors, not imagery of the anime itself, so mixing them into the
+            // gallery misrepresented what the gallery is for.
+            //
+            // TMDb is now the primary source for filling the gallery out beyond those
+            // 2, not a rare fallback: most anime are also indexed on TMDb (as a tv or
+            // movie entry) with a full posters/backdrops collection, same as the
+            // movie/animation flow gets via photos.posters + photos.backdrops. This
+            // always runs (as long as a title is known) rather than only when Anilist
+            // returned literally zero images - gating on "zero" almost never fired
+            // since Anilist nearly always has at least a poster, which is exactly why
+            // the gallery previously kept stopping at 2 images. Results are deduped by
+            // URL so the same image is never added twice.
+            //
+            // Only fills when every existing row is still blank, so it never overwrites
+            // hand-typed screenshots or a previous fetch - if real screenshots were
+            // already added, they're untouched either way. Checking "every row blank"
+            // rather than "zero children" matters because initAll() always leaves one
+            // empty placeholder row in the gallery on page load, so children.length was
+            // never actually 0 here. This runs automatically as part of the Anilist
+            // fetch; it isn't a separate step the admin has to trigger.
             const anilistGalleryContainer = document.getElementById('photoGalleryContainer');
-            if (anilistGalleryContainer && anilistGalleryContainer.children.length === 0) {
+            const anilistGalleryIsEmpty = !anilistGalleryContainer || Array.from(
+                anilistGalleryContainer.querySelectorAll('input')).every(inp => !inp.value.trim());
+            if (anilistGalleryContainer && anilistGalleryIsEmpty) {
                 const anilistPhotos = [];
                 const anilistPosterUrl = (data.coverImage && (data.coverImage.extraLarge || data.coverImage.large)) || '';
                 if (anilistPosterUrl) anilistPhotos.push(anilistPosterUrl);
                 if (data.bannerImage) anilistPhotos.push(data.bannerImage);
+
+                const animeTitle = (data.title && (data.title.english || data.title.romaji)) || '';
+                if (animeTitle) {
+                    const tmdbFallbackPhotos = await fetchAnimeGalleryFromTMDb(animeTitle);
+                    tmdbFallbackPhotos.forEach(url => { if (!anilistPhotos.includes(url)) anilistPhotos.push(url); });
+                }
+
                 if (anilistPhotos.length > 0) {
+                    anilistGalleryContainer.innerHTML = '';
                     anilistPhotos.forEach(url => addPhotoField(url));
                 } else {
                     addPhotoField();
@@ -7856,7 +7995,10 @@
                 if (selectedGenres.length > 0) {
                     const genreInserts = selectedGenres.map(gid => ({ [idField]: contentId, genre_id: gid }));
                     const { error: gErr } = await supabaseClient.from(joinTable).insert(genreInserts);
-                    if (gErr) console.warn('Genre insert error:', gErr);
+                    if (gErr) {
+                        console.warn('Genre insert error:', gErr);
+                        showToast('⚠️ ژانەرەکان پاشەکەوت نەکران - تکایە دووبارە هەوڵ بدەرەوە', 'error');
+                    }
                 }
 
                 const countryJoinTable = type === 'movie' ? 'movie_countries' : type === 'anime' ? 'anime_countries' :
@@ -7867,7 +8009,10 @@
                     const countryInserts = selectedCountries.map(cid => ({ [countryIdField]: contentId,
                         country_id: cid }));
                     const { error: cErr } = await supabaseClient.from(countryJoinTable).insert(countryInserts);
-                    if (cErr) console.warn('Country insert error:', cErr);
+                    if (cErr) {
+                        console.warn('Country insert error:', cErr);
+                        showToast('⚠️ وڵاتەکان پاشەکەوت نەکران - تکایە دووبارە هەوڵ بدەرەوە', 'error');
+                    }
                 }
 
                 // The genre/country join tables for this item were just rewritten above -
