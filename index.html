@@ -2048,8 +2048,52 @@
                                 <label class="block text-sm text-gray-400">ڕیزبەندی بەناوبانگی (popularity)</label>
                                 <input id="actPopularityRank" type="number" min="1" class="search-input" placeholder="بۆ نموونە ١" />
                             </div>
+                            <div>
+                                <label class="block text-sm text-gray-400">ناسنامەی لینک (slug)</label>
+                                <input id="actSlug" type="text" class="search-input" placeholder="بۆ نموونە: navin-asaad" />
+                            </div>
                         </div>
                         <div class="mt-3"><label class="block text-sm text-gray-400">ژیاننامەی ئەکتەر</label><textarea id="actBio" rows="4" class="search-input"></textarea></div>
+                    </div>
+                    <div class="bg-[#1a1a1a] p-4 rounded-xl border border-[#2a2a2a]">
+                        <h4 class="font-bold text-purple-300 mb-3">دۆخی ژیان</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+                            <div>
+                                <label class="block text-sm text-gray-400">کۆچی دوایی کردووە یاخود لەژیاندا ماوە؟</label>
+                                <select id="actIsDeceased" class="search-input" onchange="toggleActorDeathDateField()">
+                                    <option value="false">لەژیاندا ماوە</option>
+                                    <option value="true">کۆچی دوایی کردووە</option>
+                                </select>
+                            </div>
+                            <div id="actDeathDateWrap" class="hidden">
+                                <label class="block text-sm text-gray-400">بەرواری کۆچیدوایی کردن</label>
+                                <input id="actDeathDate" type="text" class="search-input" placeholder="بۆ نموونە ٢٠٢٠-٠٥-١٢" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-[#1a1a1a] p-4 rounded-xl border border-[#2a2a2a]">
+                        <h4 class="font-bold text-purple-300 mb-3">خوێندن و یەکەم دەرکەوتن</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div><label class="block text-sm text-gray-400">خوێندنی</label><input id="actEducation" type="text" class="search-input" /></div>
+                            <div><label class="block text-sm text-gray-400">یەکەم دەرکەوتن</label><input id="actFirstAppearance" type="text" class="search-input" /></div>
+                            <div class="md:col-span-2"><label class="block text-sm text-gray-400">ئەو ڕۆڵەی کە پێی ناسراو و بەناوبانگ بووە</label><input id="actBreakthroughRole" type="text" class="search-input" /></div>
+                        </div>
+                    </div>
+                    <div class="bg-[#1a1a1a] p-4 rounded-xl border border-[#2a2a2a]">
+                        <h4 class="font-bold text-purple-300 mb-1">ئارەزووەکانی</h4>
+                        <p class="text-xs text-gray-500 mb-3">خاڵ بەخاڵ زیادی بکە.</p>
+                        <div id="interestsContainer"></div>
+                        <div class="add-btn" onclick="addInterestField()"><i data-lucide="plus" class="lucide ml-2"></i>زیادکردنی ئارەزوو</div>
+                    </div>
+                    <div class="bg-[#1a1a1a] p-4 rounded-xl border border-[#2a2a2a]">
+                        <h4 class="font-bold text-purple-300 mb-1">خەڵاتەکانی بردووەتەوە</h4>
+                        <div id="awardsWonContainer"></div>
+                        <div class="add-btn" onclick="addAwardWonField()"><i data-lucide="plus" class="lucide ml-2"></i>زیادکردنی خەڵات</div>
+                    </div>
+                    <div class="bg-[#1a1a1a] p-4 rounded-xl border border-[#2a2a2a]">
+                        <h4 class="font-bold text-purple-300 mb-1">خەڵاتەکانی نامزەد کراوە بۆی</h4>
+                        <div id="awardsNominatedContainer"></div>
+                        <div class="add-btn" onclick="addAwardNominatedField()"><i data-lucide="plus" class="lucide ml-2"></i>زیادکردنی نامزەدی</div>
                     </div>
                     <div class="bg-[#1a1a1a] p-4 rounded-xl border border-[#2a2a2a]">
                         <h4 class="font-bold text-purple-300 mb-1">ئەو فیلم و درامایانەی بەژداری تێداکردووە</h4>
@@ -2072,7 +2116,13 @@
                 <h2 class="text-xl font-bold text-gray-200"><i data-lucide="users" class="lucide ml-2 text-purple-400"></i>ئەکتەرەکان</h2>
                 <span class="text-sm text-gray-400 bg-[#1a1a1a] px-4 py-1 rounded-full">کۆی گشتی: <span id="totalActorsCount">0</span></span>
             </div>
-            <div class="mb-5"><input id="searchActor" type="text" class="search-input" placeholder="گەڕان بە ناوی ئەکتەر..." oninput="renderActorsManage()" /></div>
+            <div class="mb-5 flex flex-wrap gap-2 items-center">
+                <input id="searchActor" type="text" class="search-input flex-1 min-w-[200px]" placeholder="گەڕان بە ناوی ئەکتەر..." oninput="renderActorsManage()" />
+                <button type="button" id="syncAllActorsCompaniesBtn" onclick="syncAllActorsAndCompanies()" class="gradient-btn px-4 py-3 rounded-xl text-sm font-bold transition whitespace-nowrap" title="گەڕان بەسەر هەموو بەرهەمەکاندا و بەستنەوەی خۆکاری هەر بەرهەمێکی نوێ یان زیادکراو بۆ ئەکتەرەکان و کۆمپانیاکان">
+                    <i data-lucide="refresh-cw" class="lucide ml-2"></i>نوێکردنەوەی گشتی
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 -mt-3 mb-4">ئەم دوگمەیە بەرهەمە نوێ و زیادکراوەکان بە شێوەی ئۆتۆماتیکی دەبەستێتەوە بە ئەکتەر و کۆمپانیای پەیوەندیدارەوە (بەپێی ناو).</p>
             <div id="actorsManageList" class="grid grid-cols-1 gap-4 pb-10"></div>
         </div>
 
@@ -2141,7 +2191,13 @@
                 <h2 class="text-xl font-bold text-gray-200"><i data-lucide="building" class="lucide ml-2 text-purple-400"></i>کۆمپانیایەکان</h2>
                 <span class="text-sm text-gray-400 bg-[#1a1a1a] px-4 py-1 rounded-full">کۆی گشتی: <span id="totalCompaniesCount">0</span></span>
             </div>
-            <div class="mb-5"><input id="searchCompany" type="text" class="search-input" placeholder="گەڕان بە ناوی کۆمپانیا..." oninput="renderCompaniesManage()" /></div>
+            <div class="mb-5 flex flex-wrap gap-2 items-center">
+                <input id="searchCompany" type="text" class="search-input flex-1 min-w-[200px]" placeholder="گەڕان بە ناوی کۆمپانیا..." oninput="renderCompaniesManage()" />
+                <button type="button" id="syncAllCompaniesActorsBtn" onclick="syncAllActorsAndCompanies()" class="gradient-btn px-4 py-3 rounded-xl text-sm font-bold transition whitespace-nowrap" title="گەڕان بەسەر هەموو بەرهەمەکاندا و بەستنەوەی خۆکاری هەر بەرهەمێکی نوێ یان زیادکراو بۆ ئەکتەرەکان و کۆمپانیاکان">
+                    <i data-lucide="refresh-cw" class="lucide ml-2"></i>نوێکردنەوەی گشتی
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 -mt-3 mb-4">ئەم دوگمەیە بەرهەمە نوێ و زیادکراوەکان بە شێوەی ئۆتۆماتیکی دەبەستێتەوە بە کۆمپانیا و ئەکتەری پەیوەندیدارەوە (بەپێی ناو).</p>
             <div id="companiesManageList" class="grid grid-cols-1 gap-4 pb-10"></div>
         </div>
 
@@ -2782,11 +2838,32 @@
         //   trending_order integer,                 -- display order while is_trending is true
         //   known_for jsonb default '[]'::jsonb,   -- [{content_id, content_type, title, poster_url}]
         //   credit_count int default 0,
+        //   is_deceased boolean not null default false,  -- کۆچی دوایی کردووە یاخود لەژیاندا ماوە
+        //   death_date text,                        -- بەرواری کۆچیدوایی کردن (تەنها ئەگەر is_deceased true بێت)
+        //   education text,                         -- خوێندنی
+        //   interests jsonb default '[]'::jsonb,   -- ["ئارەزوو١", "ئارەزوو٢", ...]
+        //   first_appearance text,                  -- یەکەم دەرکەوتن
+        //   breakthrough_role text,                 -- ئەو ڕۆڵەی کە پێی ناسراو و بەناوبانگ بووە
+        //   awards_won jsonb default '[]'::jsonb,  -- [{name, category, year}]
+        //   awards_nominated jsonb default '[]'::jsonb, -- [{name, category, year}]
+        //   slug text unique,                       -- ناسنامەی لینک بۆ بەکارهێنان لە URL
         //   created_at timestamptz default now()
         // );
         // alter table public.actors enable row level security;
         // create policy "actors read" on public.actors for select using (true);
         // create policy "actors write" on public.actors for all using (auth.role() = 'authenticated');
+        //
+        // -- If the `actors` table already exists, run this instead to add the new columns:
+        // alter table public.actors
+        //   add column if not exists is_deceased boolean not null default false,
+        //   add column if not exists death_date text,
+        //   add column if not exists education text,
+        //   add column if not exists interests jsonb default '[]'::jsonb,
+        //   add column if not exists first_appearance text,
+        //   add column if not exists breakthrough_role text,
+        //   add column if not exists awards_won jsonb default '[]'::jsonb,
+        //   add column if not exists awards_nominated jsonb default '[]'::jsonb,
+        //   add column if not exists slug text unique;
         //
         // create table public.companies (
         //   id uuid primary key default gen_random_uuid(),
@@ -5531,6 +5608,59 @@
             refreshIcons();
         }
 
+        function toggleActorDeathDateField() {
+            const isDeceased = document.getElementById('actIsDeceased').value === 'true';
+            const wrap = document.getElementById('actDeathDateWrap');
+            wrap.classList.toggle('hidden', !isDeceased);
+            if (!isDeceased) document.getElementById('actDeathDate').value = '';
+        }
+
+        function addInterestField(value = '') {
+            const container = document.getElementById('interestsContainer');
+            const div = document.createElement('div');
+            div.className = 'sub-item';
+            div.innerHTML = `
+                    <div style="flex:1;">
+                        <input type="text" placeholder="ئارەزوو (وەک: یاری فوتبۆڵ)" class="search-input" value="${value}">
+                    </div>
+                    <button type="button" onclick="this.parentElement.remove()" class="text-red-500"><i data-lucide="x" class="lucide"></i></button>
+                `;
+            container.appendChild(div);
+            refreshIcons();
+        }
+
+        function addAwardWonField(name = '', category = '', year = '') {
+            const container = document.getElementById('awardsWonContainer');
+            const div = document.createElement('div');
+            div.className = 'sub-item';
+            div.innerHTML = `
+                    <div style="flex:1;display:flex;flex-wrap:wrap;gap:8px;">
+                        <input type="text" placeholder="ناوی خەڵات" class="search-input" style="flex:2;min-width:140px;" value="${name}">
+                        <input type="text" placeholder="پۆل (وەک: باشترین ئەکتەر)" class="search-input" style="flex:1;min-width:100px;" value="${category}">
+                        <input type="text" placeholder="ساڵ" class="search-input" style="flex:0 0 90px;min-width:80px;" value="${year}">
+                    </div>
+                    <button type="button" onclick="this.parentElement.remove()" class="text-red-500"><i data-lucide="x" class="lucide"></i></button>
+                `;
+            container.appendChild(div);
+            refreshIcons();
+        }
+
+        function addAwardNominatedField(name = '', category = '', year = '') {
+            const container = document.getElementById('awardsNominatedContainer');
+            const div = document.createElement('div');
+            div.className = 'sub-item';
+            div.innerHTML = `
+                    <div style="flex:1;display:flex;flex-wrap:wrap;gap:8px;">
+                        <input type="text" placeholder="ناوی خەڵات" class="search-input" style="flex:2;min-width:140px;" value="${name}">
+                        <input type="text" placeholder="پۆل (وەک: باشترین ئەکتەر)" class="search-input" style="flex:1;min-width:100px;" value="${category}">
+                        <input type="text" placeholder="ساڵ" class="search-input" style="flex:0 0 90px;min-width:80px;" value="${year}">
+                    </div>
+                    <button type="button" onclick="this.parentElement.remove()" class="text-red-500"><i data-lucide="x" class="lucide"></i></button>
+                `;
+            container.appendChild(div);
+            refreshIcons();
+        }
+
         function addCastField(actor = '', image = '', character = '') {
             const container = document.getElementById('castContainer');
             const div = document.createElement('div');
@@ -6423,6 +6553,19 @@
             document.getElementById('actTmdbId').value = '';
             document.getElementById('actGender').value = '';
             document.getElementById('actPopularityRank').value = '';
+            document.getElementById('actSlug').value = '';
+            document.getElementById('actIsDeceased').value = 'false';
+            document.getElementById('actDeathDate').value = '';
+            document.getElementById('actEducation').value = '';
+            document.getElementById('actFirstAppearance').value = '';
+            document.getElementById('actBreakthroughRole').value = '';
+            toggleActorDeathDateField();
+            document.getElementById('interestsContainer').innerHTML = '';
+            addInterestField();
+            document.getElementById('awardsWonContainer').innerHTML = '';
+            addAwardWonField();
+            document.getElementById('awardsNominatedContainer').innerHTML = '';
+            addAwardNominatedField();
             actKnownFor = [];
             renderActKnownForChips();
             clearActorTMDBPreview();
@@ -6443,6 +6586,47 @@
             document.getElementById('actGender').value = item.gender != null ? String(item.gender) : '';
             document.getElementById('actPopularityRank').value = item.popularity_rank != null ? item
                 .popularity_rank : '';
+            document.getElementById('actSlug').value = item.slug || '';
+            document.getElementById('actIsDeceased').value = item.is_deceased ? 'true' : 'false';
+            document.getElementById('actDeathDate').value = item.death_date || '';
+            toggleActorDeathDateField();
+            document.getElementById('actEducation').value = item.education || '';
+            document.getElementById('actFirstAppearance').value = item.first_appearance || '';
+            document.getElementById('actBreakthroughRole').value = item.breakthrough_role || '';
+
+            document.getElementById('interestsContainer').innerHTML = '';
+            if (Array.isArray(item.interests) && item.interests.length > 0) {
+                item.interests.forEach(i => addInterestField(typeof i === 'string' ? i : (i.name || '')));
+            } else {
+                addInterestField();
+            }
+
+            document.getElementById('awardsWonContainer').innerHTML = '';
+            if (Array.isArray(item.awards_won) && item.awards_won.length > 0) {
+                item.awards_won.forEach(a => {
+                    if (typeof a === 'string') {
+                        addAwardWonField(a);
+                    } else if (a && typeof a === 'object') {
+                        addAwardWonField(a.name || '', a.category || '', a.year || '');
+                    }
+                });
+            } else {
+                addAwardWonField();
+            }
+
+            document.getElementById('awardsNominatedContainer').innerHTML = '';
+            if (Array.isArray(item.awards_nominated) && item.awards_nominated.length > 0) {
+                item.awards_nominated.forEach(a => {
+                    if (typeof a === 'string') {
+                        addAwardNominatedField(a);
+                    } else if (a && typeof a === 'object') {
+                        addAwardNominatedField(a.name || '', a.category || '', a.year || '');
+                    }
+                });
+            } else {
+                addAwardNominatedField();
+            }
+
             actKnownFor = Array.isArray(item.known_for) ? item.known_for.map(k => ({ ...k })) : [];
             renderActKnownForChips();
             clearActorTMDBPreview();
@@ -6471,6 +6655,32 @@
             }
             const genderRaw = document.getElementById('actGender').value;
             const popularityRaw = document.getElementById('actPopularityRank').value;
+            const isDeceased = document.getElementById('actIsDeceased').value === 'true';
+
+            const interests = [];
+            document.querySelectorAll('#interestsContainer .sub-item input').forEach(inp => {
+                const v = inp.value.trim();
+                if (v) interests.push(v);
+            });
+
+            const awardsWon = [];
+            document.querySelectorAll('#awardsWonContainer .sub-item').forEach(w => {
+                const inputs = w.querySelectorAll('input');
+                const name = inputs[0]?.value.trim();
+                const category = inputs[1]?.value.trim();
+                const year = inputs[2]?.value.trim();
+                if (name) awardsWon.push({ name, category, year });
+            });
+
+            const awardsNominated = [];
+            document.querySelectorAll('#awardsNominatedContainer .sub-item').forEach(w => {
+                const inputs = w.querySelectorAll('input');
+                const name = inputs[0]?.value.trim();
+                const category = inputs[1]?.value.trim();
+                const year = inputs[2]?.value.trim();
+                if (name) awardsNominated.push({ name, category, year });
+            });
+
             const data = {
                 tmdb_id: document.getElementById('actTmdbId').value.trim() || null,
                 photo_url: document.getElementById('actPhoto').value.trim(),
@@ -6483,7 +6693,16 @@
                 gender: genderRaw ? parseInt(genderRaw, 10) : null, // 1 = مێ, 2 = نێر
                 popularity_rank: popularityRaw ? parseInt(popularityRaw, 10) : null,
                 known_for: actKnownFor,
-                credit_count: actKnownFor.length
+                credit_count: actKnownFor.length,
+                slug: document.getElementById('actSlug').value.trim() || null,
+                is_deceased: isDeceased,
+                death_date: isDeceased ? (document.getElementById('actDeathDate').value.trim() || null) : null,
+                education: document.getElementById('actEducation').value.trim(),
+                first_appearance: document.getElementById('actFirstAppearance').value.trim(),
+                breakthrough_role: document.getElementById('actBreakthroughRole').value.trim(),
+                interests: interests,
+                awards_won: awardsWon,
+                awards_nominated: awardsNominated
             };
             try {
                 if (editId) {
@@ -6532,12 +6751,15 @@
                 const photo = item.photo_url || 'https://via.placeholder.com/80x120/1a1a1a/7c3aed?text=No+Image';
                 const creditCount = item.credit_count || (Array.isArray(item.known_for) ? item.known_for.length : 0);
                 const genderLabel = item.gender === 1 ? 'مێ' : item.gender === 2 ? 'نێر' : '-';
+                const lifeStatus = item.is_deceased ?
+                    `کۆچی دوایی کردووە${item.death_date ? ' (' + item.death_date + ')' : ''}` : 'لەژیاندا ماوە';
                 card.innerHTML = `
                         <img src="${photo}" onerror="this.src='https://via.placeholder.com/80x120/1a1a1a/7c3aed?text=No+Image'">
                         <div class="info">
                             <h3>${item.name_kurdish} <span class="text-sm text-gray-400">(${item.name_english})</span></h3>
                             <div class="meta">وڵات: ${item.country || '-'} | شاری لەدایکبوون: ${item.birth_city || '-'} | ساڵی لەدایکبوون: ${item.birth_year || '-'}</div>
                             <div class="meta">ڕەگەز: ${genderLabel} | ڕیزبەندی بەناوبانگی: ${item.popularity_rank != null ? item.popularity_rank : '-'}</div>
+                            <div class="meta">دۆخ: ${lifeStatus} ${item.breakthrough_role ? '| ڕۆڵی ناسراوی: ' + item.breakthrough_role : ''}</div>
                             <div class="meta">ژمارەی فیلم و زنجیرەکان: ${creditCount} ${item.is_trending ? `<span class="top250-badge" style="background:#22c55e;">🔥 ترێند #${item.trending_order != null ? item.trending_order : ''}</span>` : ''}</div>
                         </div>
                         <div class="flex gap-2">
@@ -7821,6 +8043,213 @@
         }
 
         // ============================================================
+        // AUTO-LINK CONTENT <-> ACTORS / COMPANIES
+        // ------------------------------------------------------------
+        // cast (on movies/animation/anime) and studio are stored as free
+        // text on the content row - there's no FK/join table. So linking
+        // works by matching names: an actor's `name_kurdish` / `name_english`
+        // against each cast member's `name`, and a company's `name_kurdish` /
+        // `name_english` against the `studio` text. Matching is
+        // case-insensitive and trims whitespace; a cast/studio name only
+        // links to an actor/company whose stored name equals it.
+        //
+        // Two entry points:
+        //   - syncContentToActorsAndCompanies(item): called right after a
+        //     single content item is saved. Only touches the actors/companies
+        //     referenced by *that* item, so it's cheap on every save.
+        //   - syncAllActorsAndCompanies(): full rebuild across every actor
+        //     and company against all movies/animation/anime, wired to the
+        //     "نوێکردنەوەی گشتی" buttons in the Actors/Companies management
+        //     screens.
+        // ============================================================
+        function normalizeNameForMatch(str) {
+            return (str || '').toString().trim().toLowerCase();
+        }
+
+        function contentPoolWithType() {
+            return [
+                ...allMovies.map(m => ({ ...m, _type: 'movie' })),
+                ...allAnimations.map(a => ({ ...a, _type: 'animation' })),
+                ...allAnime.map(a => ({ ...a, _type: 'anime' }))
+            ];
+        }
+
+        // Builds the { content_id, content_type, title, poster_url } credit entry
+        // shape used by both known_for (actors) and famous_productions (companies).
+        function creditEntryFor(item) {
+            return {
+                content_id: item.id,
+                content_type: item.type || item._type,
+                title: item.kurdish_title || item.title || '',
+                poster_url: item.poster_url || ''
+            };
+        }
+
+        function creditListHasEntry(list, entry) {
+            return (list || []).some(k => String(k.content_id) === String(entry.content_id) && k.content_type ===
+                entry.content_type);
+        }
+
+        // Adds `entry` into actor.known_for (in-memory + allActors cache) if it's
+        // not already there, and persists the change to Supabase. Returns true if
+        // a DB write happened.
+        async function addCreditToActor(actor, entry) {
+            const knownFor = Array.isArray(actor.known_for) ? actor.known_for.slice() : [];
+            if (creditListHasEntry(knownFor, entry)) return false;
+            knownFor.push(entry);
+            const { error } = await supabaseClient.from('actors').update({ known_for: knownFor, credit_count:
+                knownFor.length }).eq('id', actor.id);
+            if (error) { console.warn('Auto-link actor update error:', error);
+                return false; }
+            actor.known_for = knownFor;
+            actor.credit_count = knownFor.length;
+            const idx = allActors.findIndex(a => String(a.id) === String(actor.id));
+            if (idx >= 0) allActors[idx] = { ...allActors[idx], known_for: knownFor, credit_count: knownFor.length };
+            return true;
+        }
+
+        // Same idea as addCreditToActor(), for company.famous_productions.
+        async function addCreditToCompany(company, entry) {
+            const famous = Array.isArray(company.famous_productions) ? company.famous_productions.slice() : [];
+            if (creditListHasEntry(famous, entry)) return false;
+            famous.push(entry);
+            const { error } = await supabaseClient.from('companies').update({ famous_productions: famous,
+                production_count: famous.length }).eq('id', company.id);
+            if (error) { console.warn('Auto-link company update error:', error);
+                return false; }
+            company.famous_productions = famous;
+            company.production_count = famous.length;
+            const idx = allCompanies.findIndex(c => String(c.id) === String(company.id));
+            if (idx >= 0) allCompanies[idx] = { ...allCompanies[idx], famous_productions: famous, production_count:
+                famous.length };
+            return true;
+        }
+
+        // Called right after a single content item (movie/animation/anime) is
+        // created or updated. Looks at that item's cast[] and studio, matches
+        // each name against allActors/allCompanies, and appends the credit to
+        // any match that doesn't already have it. Silent - only shown to the
+        // user via the eventual updated counts, matching how the rest of the
+        // form save already works.
+        async function syncContentToActorsAndCompanies(item) {
+            if (!item || !item.id) return;
+            const entry = creditEntryFor(item);
+            let actorsLinked = 0;
+            let companiesLinked = 0;
+
+            const castNames = Array.isArray(item.cast) ? item.cast.map(c => normalizeNameForMatch(c.name)).filter(
+                Boolean) : [];
+            if (castNames.length > 0) {
+                for (const actor of allActors) {
+                    const matches = castNames.includes(normalizeNameForMatch(actor.name_kurdish)) || castNames
+                        .includes(normalizeNameForMatch(actor.name_english));
+                    if (!matches) continue;
+                    const linked = await addCreditToActor(actor, entry);
+                    if (linked) actorsLinked++;
+                }
+            }
+
+            const studioName = normalizeNameForMatch(item.studio);
+            if (studioName) {
+                // studio field can hold several names separated by "، " (see cStudio
+                // placeholder text) - split so each named company still matches.
+                const studioParts = item.studio.split(/[،,]/).map(s => normalizeNameForMatch(s)).filter(Boolean);
+                for (const company of allCompanies) {
+                    const compKurdish = normalizeNameForMatch(company.name_kurdish);
+                    const compEnglish = normalizeNameForMatch(company.name_english);
+                    const matches = studioParts.includes(compKurdish) || studioParts.includes(compEnglish) ||
+                        studioName === compKurdish || studioName === compEnglish;
+                    if (!matches) continue;
+                    const linked = await addCreditToCompany(company, entry);
+                    if (linked) companiesLinked++;
+                }
+            }
+
+            if (actorsLinked > 0 || companiesLinked > 0) {
+                renderActorsManage();
+                renderCompaniesManage();
+                updateStats();
+            }
+            return { actorsLinked, companiesLinked };
+        }
+
+        // Full rebuild: for every actor and every company, scan ALL content
+        // (movies + animation + anime) and add any credit link that's missing.
+        // Wired to the "نوێکردنەوەی گشتی" buttons on the Actors/Companies
+        // management screens. Existing known_for/famous_productions entries are
+        // kept as-is (never removed) - this only adds what's missing.
+        async function syncAllActorsAndCompanies() {
+            const btn = document.getElementById('syncAllActorsCompaniesBtn');
+            const btnCompanies = document.getElementById('syncAllCompaniesActorsBtn');
+            [btn, btnCompanies].forEach(b => { if (b) { b.disabled = true;
+                    b.dataset.origHtml = b.dataset.origHtml || b.innerHTML;
+                    b.innerHTML = '<i data-lucide="loader" class="lucide animate-spin"></i> نوێکردنەوە...';
+                    refreshIcons(); } });
+
+            const pool = contentPoolWithType();
+            let actorsTouched = new Set();
+            let companiesTouched = new Set();
+            let totalLinks = 0;
+
+            try {
+                for (const item of pool) {
+                    const entry = creditEntryFor(item);
+                    const castNames = Array.isArray(item.cast) ? item.cast.map(c => normalizeNameForMatch(c.name))
+                        .filter(Boolean) : [];
+                    if (castNames.length > 0) {
+                        for (const actor of allActors) {
+                            const matches = castNames.includes(normalizeNameForMatch(actor.name_kurdish)) ||
+                                castNames.includes(normalizeNameForMatch(actor.name_english));
+                            if (!matches) continue;
+                            const linked = await addCreditToActor(actor, entry);
+                            if (linked) { actorsTouched.add(actor.id);
+                                totalLinks++; }
+                        }
+                    }
+                    if (item.studio) {
+                        const studioParts = item.studio.split(/[،,]/).map(s => normalizeNameForMatch(s)).filter(
+                            Boolean);
+                        const studioWhole = normalizeNameForMatch(item.studio);
+                        if (studioParts.length > 0) {
+                            for (const company of allCompanies) {
+                                const compKurdish = normalizeNameForMatch(company.name_kurdish);
+                                const compEnglish = normalizeNameForMatch(company.name_english);
+                                const matches = studioParts.includes(compKurdish) || studioParts.includes(
+                                        compEnglish) || studioWhole === compKurdish || studioWhole === compEnglish;
+                                if (!matches) continue;
+                                const linked = await addCreditToCompany(company, entry);
+                                if (linked) { companiesTouched.add(company.id);
+                                    totalLinks++; }
+                            }
+                        }
+                    }
+                }
+
+                renderActorsManage();
+                renderCompaniesManage();
+                updateStats();
+
+                if (totalLinks === 0) {
+                    showToast('هەموو شتێک پێشتر یەکخراوە بوو - هیچ نوێیەک نەبوو', 'success');
+                } else {
+                    showToast(
+                        `✅ نوێکرایەوە: ${totalLinks} بەستنەوەی نوێ زیادکرا (${actorsTouched.size} ئەکتەر، ${companiesTouched.size} کۆمپانیا)`,
+                        'success');
+                }
+                logAction('actors_companies_sync',
+                    `نوێکردنەوەی گشتی: ${totalLinks} بەستنەوەی نوێ (${actorsTouched.size} ئەکتەر، ${companiesTouched.size} کۆمپانیا)`
+                );
+            } catch (err) {
+                console.error(err);
+                showToast('هەڵە لە نوێکردنەوەی گشتی: ' + err.message, 'error');
+            } finally {
+                [btn, btnCompanies].forEach(b => { if (b) { b.disabled = false;
+                        b.innerHTML = b.dataset.origHtml;
+                        refreshIcons(); } });
+            }
+        }
+
+        // ============================================================
         // SAVE CONTENT (unchanged but note that we keep OMDb ratings)
         // ============================================================
         document.getElementById('contentForm').addEventListener('submit', async function(e) {
@@ -8013,6 +8442,24 @@
                         console.warn('Country insert error:', cErr);
                         showToast('⚠️ وڵاتەکان پاشەکەوت نەکران - تکایە دووبارە هەوڵ بدەرەوە', 'error');
                     }
+                }
+
+                // Auto-link this saved item's cast members and studio/company to the
+                // actors/companies tables, so nobody has to manually search-and-add the
+                // content on the actor/company form afterwards - see syncContentToActorsAndCompanies().
+                try {
+                    await syncContentToActorsAndCompanies({
+                        id: contentId,
+                        type: type,
+                        title: baseData.title,
+                        kurdish_title: baseData.kurdish_title,
+                        poster_url: baseData.poster_url,
+                        release_date: baseData.release_date,
+                        cast: baseData.cast,
+                        studio: baseData.studio
+                    });
+                } catch (syncErr) {
+                    console.warn('Actor/company auto-sync error:', syncErr);
                 }
 
                 // The genre/country join tables for this item were just rewritten above -
@@ -8469,6 +8916,10 @@
             addCastField();
             addVoiceCastField();
             addPhotoField();
+            addInterestField();
+            addAwardWonField();
+            addAwardNominatedField();
+            toggleActorDeathDateField();
             document.getElementById('tmdbPreview').classList.remove('show');
             document.getElementById('tmdbSearchResults').style.display = 'none';
             clearAnilistPreview();
