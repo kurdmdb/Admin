@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build && cp index.html public/index.html",
+  "buildCommand": "npm run build && cp index.html public/index.html && cp sw.js public/sw.js",
   "outputDirectory": "public",
   "headers": [
     {
