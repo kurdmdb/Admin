@@ -1,12 +1,6 @@
 {
   "buildCommand": "npm run build && cp index.html public/index.html && cp sw.js public/sw.js",
   "outputDirectory": "public",
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
